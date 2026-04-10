@@ -206,8 +206,8 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/${{ github.repository_owner }}/kestrel-core:latest
-            ghcr.io/${{ github.repository_owner }}/kestrel-core:v${{ needs.prepare.outputs.version }}
+            ghcr.io/${{ github.repository }}/core:latest
+            ghcr.io/${{ github.repository }}/core:v${{ needs.prepare.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

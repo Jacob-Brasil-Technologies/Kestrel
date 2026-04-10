@@ -210,7 +210,7 @@ jobs:
           file: apps/core/Dockerfile
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository_owner }}/kestrel-core:dev
+          tags: ghcr.io/${{ github.repository }}/core:dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
