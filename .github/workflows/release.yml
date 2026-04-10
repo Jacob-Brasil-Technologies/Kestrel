@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      image: ${{ steps.version.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +31,9 @@ jobs:
         id: version
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          IMAGE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/core"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "### Release version: \`v$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------
@@ -132,7 +135,7 @@ jobs:
 
       - name: Assemble standalone output
         run: |
-          mkdir -p dashboard-standalone
+          mkdir -p dashboard-standalone/.next
           cp -r apps/dashboard/.next/standalone/* dashboard-standalone/
           cp -r apps/dashboard/.next/static dashboard-standalone/.next/static
           cp -r apps/dashboard/public dashboard-standalone/public
@@ -206,8 +209,8 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/${{ github.repository }}/core:latest
-            ghcr.io/${{ github.repository }}/core:v${{ needs.prepare.outputs.version }}
+            ${{ needs.prepare.outputs.image }}:latest
+            ${{ needs.prepare.outputs.image }}:v${{ needs.prepare.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

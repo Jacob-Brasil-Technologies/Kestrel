@@ -27,6 +27,7 @@ jobs:
     outputs:
       version: ${{ steps.meta.outputs.version }}
       short_sha: ${{ steps.meta.outputs.short_sha }}
+      image: ${{ steps.meta.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,8 +36,10 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          IMAGE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')/core"
           echo "version=${VERSION}-dev.${SHORT_SHA}" >> "$GITHUB_OUTPUT"
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "### Nightly build: \`${VERSION}-dev.${SHORT_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------------
@@ -137,7 +140,7 @@ jobs:
 
       - name: Assemble standalone output
         run: |
-          mkdir -p dashboard-standalone
+          mkdir -p dashboard-standalone/.next
           cp -r apps/dashboard/.next/standalone/* dashboard-standalone/
           cp -r apps/dashboard/.next/static dashboard-standalone/.next/static
           cp -r apps/dashboard/public dashboard-standalone/public
@@ -210,7 +213,7 @@ jobs:
           file: apps/core/Dockerfile
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/${{ github.repository }}/core:dev
+          tags: ${{ needs.prepare.outputs.image }}:dev
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

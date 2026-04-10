@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
-import { basename, join } from 'path';
+import { basename, dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
 // ---------------------------------------------------------------------------
 // Types for the JSON schema
@@ -43,7 +44,7 @@ interface GameTypeJson {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TYPES_DIR = join(new URL('.', import.meta.url).pathname, '..');
+const TYPES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GAMES_DIR = join(TYPES_DIR, 'games');
 
 function toEnumValue(name: string): string {
