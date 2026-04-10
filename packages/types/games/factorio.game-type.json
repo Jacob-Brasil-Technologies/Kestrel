@@ -1,0 +1,17 @@
+{
+	"$schema": "game-type.schema.json",
+	"runtime": "native",
+	"supportedPlatforms": ["linux"],
+	"details": {
+		"name": "Factorio",
+		"developer": "Wube Software",
+		"icon": "factorio.png",
+		"developerIcon": "wube-software.jpeg"
+	},
+	"variants": [
+		{
+			"name": "Vanilla",
+			"desc": "The standard headless Factorio dedicated server"
+		}
+	]
+}

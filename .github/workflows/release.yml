@@ -1,0 +1,234 @@
+# =============================================================================
+# Release — runs when a PR is merged into main
+# Creates a GitHub release with changelog, core + dashboard archives, and a
+# Docker image pushed to ghcr.io.
+# =============================================================================
+name: Release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Gate — only proceed if the PR was actually merged
+  # ---------------------------------------------------------------------------
+  prepare:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "### Release version: \`v$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # 2. Build Core — per-OS matrix (native modules need platform-specific build)
+  # ---------------------------------------------------------------------------
+  build-core:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux
+            arch: x64
+          - runner: windows-latest
+            platform: windows
+            arch: x64
+          - runner: macos-latest
+            platform: macos
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @kestrel/types generate
+
+      - run: pnpm --filter @kestrel/core build
+
+      - name: Package with production dependencies
+        run: pnpm --filter @kestrel/core deploy --prod --legacy kestrel-core-out
+
+      - name: Copy compiled output
+        shell: bash
+        run: cp -r apps/core/dist kestrel-core-out/dist
+
+      - name: Create start script (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cat > kestrel-core-out/start.sh << 'EOF'
+          #!/usr/bin/env bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          exec node "$DIR/dist/main"
+          EOF
+          chmod +x kestrel-core-out/start.sh
+
+      - name: Create start script (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Set-Content -Path kestrel-core-out/start.bat -Value '@echo off
+          node "%~dp0dist\main"
+          pause'
+
+      - name: Archive (tar.gz)
+        if: runner.os != 'Windows'
+        run: tar -czf kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C kestrel-core-out .
+
+      - name: Archive (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path kestrel-core-out/* -DestinationPath kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}
+          path: kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}.*
+
+  # ---------------------------------------------------------------------------
+  # 3. Build Dashboard — single build, packaged per platform
+  #    Next.js standalone output is pure JS — no native modules
+  # ---------------------------------------------------------------------------
+  build-dashboard:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @kestrel/types generate
+
+      - run: pnpm --filter @kestrel/dashboard build
+
+      - name: Assemble standalone output
+        run: |
+          mkdir -p dashboard-standalone
+          cp -r apps/dashboard/.next/standalone/* dashboard-standalone/
+          cp -r apps/dashboard/.next/static dashboard-standalone/.next/static
+          cp -r apps/dashboard/public dashboard-standalone/public
+
+      - name: Package for Linux
+        run: |
+          cp -r dashboard-standalone kestrel-dashboard-pkg
+          cat > kestrel-dashboard-pkg/start.sh << 'EOF'
+          #!/usr/bin/env bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          HOSTNAME=0.0.0.0 PORT="${PORT:-3001}" exec node "$DIR/server.js"
+          EOF
+          chmod +x kestrel-dashboard-pkg/start.sh
+          tar -czf kestrel-dashboard-linux-x64.tar.gz -C kestrel-dashboard-pkg .
+          rm -rf kestrel-dashboard-pkg
+
+      - name: Package for macOS
+        run: |
+          cp -r dashboard-standalone kestrel-dashboard-pkg
+          cat > kestrel-dashboard-pkg/start.sh << 'EOF'
+          #!/usr/bin/env bash
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          HOSTNAME=0.0.0.0 PORT="${PORT:-3001}" exec node "$DIR/server.js"
+          EOF
+          chmod +x kestrel-dashboard-pkg/start.sh
+          tar -czf kestrel-dashboard-macos-arm64.tar.gz -C kestrel-dashboard-pkg .
+          rm -rf kestrel-dashboard-pkg
+
+      - name: Package for Windows
+        run: |
+          cp -r dashboard-standalone kestrel-dashboard-pkg
+          cat > kestrel-dashboard-pkg/start.bat << 'EOF'
+          @echo off
+          set HOSTNAME=0.0.0.0
+          if "%PORT%"=="" set PORT=3001
+          node "%~dp0server.js"
+          pause
+          EOF
+          cd kestrel-dashboard-pkg && zip -r ../kestrel-dashboard-windows-x64.zip . && cd ..
+          rm -rf kestrel-dashboard-pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kestrel-dashboard-archives
+          path: |
+            kestrel-dashboard-linux-x64.tar.gz
+            kestrel-dashboard-macos-arm64.tar.gz
+            kestrel-dashboard-windows-x64.zip
+
+  # ---------------------------------------------------------------------------
+  # 4. Docker — build and push to GitHub Container Registry
+  # ---------------------------------------------------------------------------
+  docker:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/core/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/kestrel-core:latest
+            ghcr.io/${{ github.repository_owner }}/kestrel-core:v${{ needs.prepare.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # 5. Release — create a GitHub release with all artifacts
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [prepare, build-core, build-dashboard, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: v${{ needs.prepare.outputs.version }}
+          generate_release_notes: true
+          files: artifacts/*

@@ -1,0 +1,17 @@
+{
+	"$schema": "game-type.schema.json",
+	"runtime": "steamcmd",
+	"supportedPlatforms": ["linux", "windows"],
+	"details": {
+		"name": "Satisfactory",
+		"developer": "Coffee Stain Studios",
+		"icon": "satisfactory.png",
+		"developerIcon": "coffee-stain-studios.jpg"
+	},
+	"variants": [
+		{
+			"name": "Vanilla",
+			"desc": "The standard version of Satisfactory"
+		}
+	]
+}
