@@ -46,8 +46,7 @@ RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
     fi
 
 # Non-root user — required by game servers like Satisfactory that refuse to run as root
-RUN groupadd --gid 1000 kestrel \
-    && useradd --uid 1000 --gid kestrel --shell /bin/bash --create-home kestrel
+# The node:22-slim base image already includes a "node" user with UID/GID 1000
 
 WORKDIR /app
 
@@ -55,14 +54,14 @@ WORKDIR /app
 COPY --from=build /app/deploy ./
 COPY --from=build /app/apps/core/dist dist
 
-# Ensure kestrel user owns the app directory
-RUN chown -R kestrel:kestrel /app
+# Ensure node user owns the app directory
+RUN chown -R node:node /app
 
 # Data directory (SQLite DB, runtimes, instances, uploads)
 VOLUME /app/data
 
 EXPOSE 3000
 
-USER kestrel
+USER node
 
 CMD ["node", "dist/main"]
