@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ChildProcess, spawn } from 'child_process';
 import { existsSync } from 'fs';
+import { chmod } from 'fs/promises';
 import { resolve, join } from 'path';
 import { createInterface } from 'readline';
 import { Repository } from 'typeorm';
@@ -153,9 +154,28 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 
 		await this.pushConsoleLine(instanceId, `Starting server "${instance.name}"...`, ConsoleSource.SYSTEM);
 
+		// Ensure executable permissions (critical in Docker / Linux)
+		if (process.platform !== 'win32') {
+			try {
+				await chmod(runtimePath, 0o755);
+			} catch {
+				this.logger.warn(`Could not chmod ${runtimePath} — may already be executable`);
+			}
+		}
+
 		const child = spawn(runtimePath, instance.serverArgs ?? [], {
 			cwd: instance.instancePath,
 			stdio: ['pipe', 'pipe', 'pipe'],
+		});
+
+		// Attach error handler IMMEDIATELY to prevent unhandled 'error' events.
+		// Without this, a spawn failure (EACCES, ENOENT) emits 'error' on the
+		// next tick — if we throw before attaching, Node crashes.
+		child.on('error', (err) => {
+			this.logger.error(`Process error for "${instance.name}": ${err.message}`);
+			this.processes.delete(instanceId);
+			void this.pushConsoleLine(instanceId, `Process error: ${err.message}`, ConsoleSource.SYSTEM);
+			void this.instanceService.updateStatus(instanceId, InstanceStatus.CRASHED, null);
 		});
 
 		if (!child.pid) {
@@ -197,13 +217,6 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 					void this.instanceService.updateStatus(instanceId, InstanceStatus.CRASHED, null);
 				}
 			});
-		});
-
-		child.on('error', (err) => {
-			this.logger.error(`Process error for "${instance.name}": ${err.message}`);
-			this.processes.delete(instanceId);
-			void this.pushConsoleLine(instanceId, `Process error: ${err.message}`, ConsoleSource.SYSTEM);
-			void this.instanceService.updateStatus(instanceId, InstanceStatus.CRASHED, null);
 		});
 
 		this.logger.log(`Server "${instance.name}" started (PID: ${child.pid}).`);
