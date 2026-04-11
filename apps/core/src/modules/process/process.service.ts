@@ -20,6 +20,9 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 	private readonly logger = new Logger('ProcessService');
 	private readonly processes = new Map<string, ChildProcess>();
 	private readonly sessionTimestamps = new Map<string, number>();
+	private pendingLogs: ConsoleLog[] = [];
+	private flushTimer: ReturnType<typeof setTimeout> | null = null;
+	private readonly FLUSH_INTERVAL_MS = 250;
 
 	constructor(
 		private readonly instanceService: InstanceService,
@@ -33,6 +36,8 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 	}
 
 	onModuleDestroy(): void {
+		if (this.flushTimer) clearTimeout(this.flushTimer);
+		void this.flushLogs();
 		for (const [instanceId, proc] of this.processes) {
 			this.logger.warn(`Shutting down process for instance ${instanceId} (PID: ${proc.pid})`);
 			proc.kill('SIGTERM');
@@ -98,16 +103,38 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 			source,
 			sessionStartedAt,
 		});
-		await this.consoleLogRepository.save(log);
 
+		// Emit the event immediately so subscriptions are real-time
 		const consoleLine: ConsoleLine = {
 			instanceId,
 			line,
 			timestamp: log.createdAt,
 			source,
 		};
-
 		this.eventEmitter.emit(CONSOLE_LOG_EVENT, consoleLine);
+
+		// Batch the DB write
+		this.pendingLogs.push(log);
+		this.scheduleFlush();
+	}
+
+	private scheduleFlush(): void {
+		if (this.flushTimer) return;
+		this.flushTimer = setTimeout(() => {
+			this.flushTimer = null;
+			void this.flushLogs();
+		}, this.FLUSH_INTERVAL_MS);
+	}
+
+	private async flushLogs(): Promise<void> {
+		if (this.pendingLogs.length === 0) return;
+		const batch = this.pendingLogs;
+		this.pendingLogs = [];
+		try {
+			await this.consoleLogRepository.save(batch);
+		} catch (err) {
+			this.logger.error(`Failed to flush ${batch.length} console logs: ${err}`);
+		}
 	}
 
 	public async getConsoleHistory(instanceId: string): Promise<ConsoleLine[]> {

@@ -25,6 +25,12 @@ import { VariantModule } from './modules/variant/variant.module';
 			database: join(process.cwd(), 'data', 'store', 'kestrel.db'),
 			autoLoadEntities: true,
 			synchronize: true,
+			// WAL mode allows concurrent reads while writing — prevents console log
+			// writes from blocking GraphQL queries during server startup.
+			prepareDatabase: (db: any) => {
+				db.pragma('journal_mode = WAL');
+				db.pragma('busy_timeout = 3000');
+			},
 		}),
 		ServeStaticModule.forRoot(
 			{
