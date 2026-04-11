@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { gql } from '@apollo/client';
 import { useQuery } from '@apollo/client/react';
 import { useCores } from '@/lib/core/core-provider';
@@ -44,12 +44,20 @@ const InstanceContext = createContext<InstanceContextValue | null>(null);
 
 export function InstanceProvider({ children }: { children: React.ReactNode }) {
 	const { activeCore } = useCores();
-	const { data, loading } = useQuery<{ instances: InstanceData[] }>(GET_INSTANCES, {
+	const { data, loading: queryLoading } = useQuery<{ instances: InstanceData[] }>(GET_INSTANCES, {
 		skip: !activeCore,
 		pollInterval: 5000,
 	});
 
 	const instances = data?.instances ?? [];
+
+	// Only show loading for the initial fetch — not during poll refetches.
+	// Apollo Client 4.x sets loading=true on polls, which would unmount the
+	// dropdown/dialog in InstanceSwitcher and reset user state.
+	const initialLoadDone = useRef(false);
+	if (data) initialLoadDone.current = true;
+	const loading = queryLoading && !initialLoadDone.current;
+
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [activeView, setActiveView] = useState<SidebarView>('console');
 

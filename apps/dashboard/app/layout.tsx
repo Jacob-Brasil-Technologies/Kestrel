@@ -27,7 +27,7 @@ export default function RootLayout({
 }>) {
 	return (
 		<html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
-			<body className="min-h-full flex flex-col antialiased">
+			<body className="h-dvh overflow-hidden flex flex-col antialiased">
 				<ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
 					<CoreProvider>
 						<ApolloProvider>{children}</ApolloProvider>

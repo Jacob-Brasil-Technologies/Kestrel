@@ -1,4 +1,4 @@
-import { GameType } from '@kestrel/types';
+import { GameType, RuntimeType } from '@kestrel/types';
 import { Field, ObjectType } from '@nestjs/graphql';
 
 @ObjectType()
@@ -17,6 +17,9 @@ export class GameInfoDto {
 
 	@Field(() => GameType)
 	public type!: GameType;
+
+	@Field(() => RuntimeType)
+	public runtime!: RuntimeType;
 
 	@Field(() => [String])
 	public supportedPlatforms!: string[];

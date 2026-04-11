@@ -144,7 +144,7 @@ export default function Page() {
 		<InstanceProvider>
 			<SidebarProvider>
 				<AppSidebar />
-				<SidebarInset>
+				<SidebarInset className="overflow-hidden">
 					<ViewHeader />
 					<div className="flex flex-1 flex-col gap-4 p-4 pt-0 min-h-0">
 						<MainContent />

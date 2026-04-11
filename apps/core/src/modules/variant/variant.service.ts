@@ -67,6 +67,7 @@ export class VariantService {
 			icon: gameIconUrl,
 			developerIcon: devIconUrl,
 			type: game,
+			runtime: gameDetails.runtime,
 			supportedPlatforms: gameDetails.supportedPlatforms,
 		};
 	}

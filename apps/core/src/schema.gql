@@ -92,6 +92,7 @@ type GameInfoDto {
   icon: String!
   developerIcon: String!
   type: GameType!
+  runtime: RuntimeType!
   supportedPlatforms: [String!]!
 }
 
