@@ -4,7 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ChildProcess, spawn } from 'child_process';
 import { existsSync } from 'fs';
-import { chmod } from 'fs/promises';
+import { access, chmod, constants } from 'fs/promises';
 import { resolve, join } from 'path';
 import { createInterface } from 'readline';
 import { Repository } from 'typeorm';
@@ -63,6 +63,29 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 		const resolvedPath = resolve(instancePath);
 		if (!resolvedPath.startsWith(instancesRoot + '/') && resolvedPath !== instancesRoot) {
 			throw new Error('Security violation: instance path is outside the instances directory');
+		}
+	}
+
+	/** Find the system dynamic linker (ld-linux) for executing ELF binaries without +x */
+	private findDynamicLinker(): string | null {
+		const candidates = [
+			'/lib64/ld-linux-x86-64.so.2',
+			'/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2',
+			'/lib/ld-linux-x86-64.so.2',
+			'/lib/ld-linux-aarch64.so.1',
+			'/lib64/ld-linux-aarch64.so.1',
+			'/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1',
+		];
+		return candidates.find((p) => existsSync(p)) ?? null;
+	}
+
+	/** Check if a file has execute permission */
+	private async isExecutable(filePath: string): Promise<boolean> {
+		try {
+			await access(filePath, constants.X_OK);
+			return true;
+		} catch {
+			return false;
 		}
 	}
 
@@ -159,17 +182,39 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 			try {
 				await chmod(runtimePath, 0o755);
 			} catch {
-				this.logger.warn(`Could not chmod ${runtimePath} — will try shell fallback if needed`);
+				this.logger.warn(`Could not chmod ${runtimePath} — will try fallback`);
 			}
 		}
 
-		// For .sh scripts, spawn via /bin/sh to avoid EACCES on Docker volumes
-		// where file permissions may not be settable.
+		// Determine how to spawn the executable:
+		// 1. Shell scripts (.sh) → run via /bin/sh
+		// 2. Non-executable ELF binaries → run via the dynamic linker (ld-linux)
+		//    This handles Docker volumes (e.g. Unraid) where chmod doesn't work.
+		// 3. Normal executables → run directly
+		let spawnCmd: string;
+		let spawnArgs: string[];
+		const args = instance.serverArgs ?? [];
+
 		const isShellScript = runtimePath.endsWith('.sh');
-		const spawnCmd = isShellScript ? '/bin/sh' : runtimePath;
-		const spawnArgs = isShellScript
-			? [runtimePath, ...(instance.serverArgs ?? [])]
-			: (instance.serverArgs ?? []);
+		const executable = !isShellScript && await this.isExecutable(runtimePath);
+
+		if (isShellScript) {
+			spawnCmd = '/bin/sh';
+			spawnArgs = [runtimePath, ...args];
+		} else if (!executable && process.platform === 'linux') {
+			const ldso = this.findDynamicLinker();
+			if (ldso) {
+				this.logger.warn(`Using dynamic linker to execute ${runtimePath} (no +x permission)`);
+				spawnCmd = ldso;
+				spawnArgs = [runtimePath, ...args];
+			} else {
+				spawnCmd = runtimePath;
+				spawnArgs = args;
+			}
+		} else {
+			spawnCmd = runtimePath;
+			spawnArgs = args;
+		}
 
 		const child = spawn(spawnCmd, spawnArgs, {
 			cwd: instance.instancePath,

@@ -59,7 +59,8 @@ export class SatisfactoryVanillaProvider extends AbstractVariantProvider {
 
 		return {
 			executableOverride: executablePath,
-			serverArgs: ['-unattended', '-log'],
+			// The binary requires 'FactoryGame' as its first positional argument
+			serverArgs: ['FactoryGame', '-unattended', '-log'],
 		};
 	}
 
@@ -68,13 +69,14 @@ export class SatisfactoryVanillaProvider extends AbstractVariantProvider {
 			const winPath = join(targetDir, 'FactoryServer.exe');
 			if (existsSync(winPath)) return winPath;
 		} else {
-			// Linux — the script is at the root of the install
-			const linuxPath = join(targetDir, 'FactoryServer.sh');
-			if (existsSync(linuxPath)) return linuxPath;
-
-			// Some versions use a direct binary
+			// Linux — prefer the actual binary over the .sh wrapper.
+			// The .sh wrapper tries to chmod the binary internally, which
+			// fails on Docker volumes that don't support Unix permissions.
 			const binaryPath = join(targetDir, 'Engine', 'Binaries', 'Linux', 'FactoryServer-Linux-Shipping');
 			if (existsSync(binaryPath)) return binaryPath;
+
+			const linuxPath = join(targetDir, 'FactoryServer.sh');
+			if (existsSync(linuxPath)) return linuxPath;
 		}
 
 		return null;
