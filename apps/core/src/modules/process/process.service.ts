@@ -159,11 +159,19 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 			try {
 				await chmod(runtimePath, 0o755);
 			} catch {
-				this.logger.warn(`Could not chmod ${runtimePath} — may already be executable`);
+				this.logger.warn(`Could not chmod ${runtimePath} — will try shell fallback if needed`);
 			}
 		}
 
-		const child = spawn(runtimePath, instance.serverArgs ?? [], {
+		// For .sh scripts, spawn via /bin/sh to avoid EACCES on Docker volumes
+		// where file permissions may not be settable.
+		const isShellScript = runtimePath.endsWith('.sh');
+		const spawnCmd = isShellScript ? '/bin/sh' : runtimePath;
+		const spawnArgs = isShellScript
+			? [runtimePath, ...(instance.serverArgs ?? [])]
+			: (instance.serverArgs ?? []);
+
+		const child = spawn(spawnCmd, spawnArgs, {
 			cwd: instance.instancePath,
 			stdio: ['pipe', 'pipe', 'pipe'],
 		});
