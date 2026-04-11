@@ -137,22 +137,32 @@ jobs:
           cp -r apps/dashboard/.next/static "$DASH_DIR/.next/static"
           cp -r apps/dashboard/public "$DASH_DIR/public"
 
-          # Record the entry point for the next step
+          # Debug: show structure
+          echo "=== Standalone structure (depth 3) ==="
+          find dashboard-standalone -maxdepth 3 -type f | head -40
+          echo "=== Entry point ==="
+
+          # Determine entry point
           if [ -f "$DASH_DIR/server.js" ]; then
-            echo "$DASH_DIR/server.js" > dashboard-standalone/.entry
+            ENTRY="$DASH_DIR/server.js"
           else
-            echo "dashboard-standalone/server.js" > dashboard-standalone/.entry
+            ENTRY="dashboard-standalone/server.js"
           fi
+          echo "Entry: $ENTRY"
+          echo "${ENTRY#dashboard-standalone/}" > dashboard-standalone/.entry
 
       - name: Configure pkg and build executables
         shell: bash
         run: |
           cd dashboard-standalone
-          ENTRY=$(cat .entry | sed 's|^dashboard-standalone/||')
+          ENTRY=$(cat .entry)
+          echo "Using entry point: $ENTRY"
 
           node -e "
             const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            let pkg = {};
+            try { pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); } catch {}
+            pkg.name = pkg.name || 'kestrel-dashboard';
             pkg.pkg = {
               scripts: [
                 '.next/server/**/*.js',
