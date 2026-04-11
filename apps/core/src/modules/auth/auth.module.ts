@@ -13,7 +13,15 @@ import { User } from './user.entity';
 		TypeOrmModule.forFeature([User]),
 		JwtModule.register({
 			global: true,
-			secret: process.env.JWT_SECRET ?? 'kestrel-dev-secret-change-in-production',
+			secret: (() => {
+				const jwtSecret = process.env.JWT_SECRET?.trim();
+
+				if (!jwtSecret) {
+					throw new Error('JWT_SECRET environment variable must be set');
+				}
+
+				return jwtSecret;
+			})(),
 			signOptions: { expiresIn: '7d' },
 		}),
 		forwardRef(() => CoreConfigModule),
