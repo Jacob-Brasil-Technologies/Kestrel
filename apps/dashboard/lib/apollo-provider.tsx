@@ -46,7 +46,7 @@ export function ApolloProvider({ children }: { children: React.ReactNode }) {
 	const { activeCore } = useCores();
 
 	const client = useMemo(() => {
-		const url = activeCore?.url ?? 'http://localhost:3000';
+		const url = activeCore?.url ?? 'http://localhost:17773';
 		const token = activeCore?.token ?? '';
 		return createApolloClient(url, token);
 	}, [activeCore?.url, activeCore?.token]);

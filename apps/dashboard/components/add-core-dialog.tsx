@@ -206,7 +206,7 @@ export function AddCoreDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 									<Label htmlFor="core-port">Port</Label>
 									<Input
 										id="core-port"
-										placeholder="Port"
+										placeholder="17773"
 										value={portInput}
 										onChange={(e) => setPortInput(e.target.value)}
 										onKeyDown={(e) => e.key === 'Enter' && handleConnect()}

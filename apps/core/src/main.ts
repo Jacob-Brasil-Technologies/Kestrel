@@ -6,6 +6,6 @@ async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
 	app.enableCors();
 	app.use(graphqlUploadExpress({ maxFileSize: 10_000_000, maxFiles: 1 }));
-	await app.listen(process.env.PORT ?? 3000);
+	await app.listen(process.env.KESTREL_PORT ?? 17773);
 }
 void bootstrap();

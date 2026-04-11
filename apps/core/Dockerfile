@@ -60,7 +60,8 @@ RUN chown -R node:node /app
 # Data directory (SQLite DB, runtimes, instances, uploads)
 VOLUME /app/data
 
-EXPOSE 3000
+ENV KESTREL_PORT=17773
+EXPOSE 17773
 
 USER node
 
