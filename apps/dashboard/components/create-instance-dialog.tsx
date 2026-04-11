@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { gql } from '@apollo/client';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client/react';
 import { useCores } from '@/lib/core/core-provider';
 import { GameType, GameVariant, RuntimeType, RuntimeFlag } from '@/lib/gql/graphql';
 import { GET_INSTANCES } from '@/lib/instance/instance-provider';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LoaderIcon, ServerIcon, ArrowLeftIcon, SearchIcon, MonitorIcon } from 'lucide-react';
+import { LoaderIcon, ServerIcon, ArrowLeftIcon, SearchIcon, MonitorIcon, CheckCircleIcon, XCircleIcon } from 'lucide-react';
 
 const PLATFORM_LABELS: Record<string, string> = {
 	linux: 'Linux',
@@ -81,6 +81,15 @@ const GET_AVAILABLE_RUNTIMES = gql`
 	}
 `;
 
+const INSTANCE_SETUP_LOGS_SUB = gql`
+	subscription InstanceSetupLogs($correlationId: String!) {
+		instanceSetupLogs(correlationId: $correlationId) {
+			message
+			timestamp
+		}
+	}
+`;
+
 interface UserConfigEntry {
 	configType: string;
 	default: string;
@@ -109,11 +118,12 @@ interface AvailableRuntime {
 	flags: RuntimeFlag[];
 }
 
-type Step = 'game' | 'variant' | 'configure';
+type Step = 'game' | 'variant' | 'configure' | 'creating';
 
 export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
 	const { activeCore } = useCores();
 	const baseUrl = activeCore?.url ?? '';
+	const client = useApolloClient();
 
 	const [step, setStep] = useState<Step>('game');
 	const [selectedGame, setSelectedGame] = useState<GameInfo | null>(null);
@@ -127,6 +137,10 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 	const [error, setError] = useState('');
 	const [gameSearch, setGameSearch] = useState('');
 	const [variantSearch, setVariantSearch] = useState('');
+	const [setupLogs, setSetupLogs] = useState<string[]>([]);
+	const [createDone, setCreateDone] = useState(false);
+	const logsEndRef = useRef<HTMLDivElement>(null);
+	const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
 
 	const { data: gamesData, loading: gamesLoading } = useQuery<{ getGames: GameInfo[] }>(GET_GAMES, {
 		skip: !activeCore,
@@ -160,6 +174,8 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 	});
 
 	function reset() {
+		subscriptionRef.current?.unsubscribe();
+		subscriptionRef.current = null;
 		setStep('game');
 		setSelectedGame(null);
 		setSelectedVariant(null);
@@ -172,7 +188,14 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 		setError('');
 		setGameSearch('');
 		setVariantSearch('');
+		setSetupLogs([]);
+		setCreateDone(false);
 	}
+
+	// Auto-scroll setup logs
+	useEffect(() => {
+		logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+	}, [setupLogs]);
 
 	function handleOpenChange(open: boolean) {
 		if (!open) reset();
@@ -224,6 +247,24 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 
 	async function handleCreate() {
 		setError('');
+		setSetupLogs([]);
+		setCreateDone(false);
+
+		const cid = crypto.randomUUID();
+
+		// Subscribe to setup progress before starting the mutation
+		const observable = client.subscribe({
+			query: INSTANCE_SETUP_LOGS_SUB,
+			variables: { correlationId: cid },
+		});
+
+		subscriptionRef.current = observable.subscribe((result) => {
+			const msg = (result.data as any)?.instanceSetupLogs?.message;
+			if (msg) setSetupLogs((prev) => [...prev, msg]);
+		});
+
+		setStep('creating');
+
 		try {
 			const hasMinMem = selectedGame!.userConfig.some(c => c.configType === 'minMemory');
 			const hasMaxMem = selectedGame!.userConfig.some(c => c.configType === 'maxMemory');
@@ -238,11 +279,16 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 						...(hasMinMem && minMemory ? { minMemory: parseInt(minMemory) } : {}),
 						...(hasMaxMem && maxMemory ? { maxMemory: parseInt(maxMemory) } : {}),
 						port: port ? parseInt(port) : undefined,
+						correlationId: cid,
 					},
 				},
 			});
-			handleOpenChange(false);
+			subscriptionRef.current?.unsubscribe();
+			subscriptionRef.current = null;
+			setCreateDone(true);
 		} catch (e: any) {
+			subscriptionRef.current?.unsubscribe();
+			subscriptionRef.current = null;
 			setError(e.message || 'Failed to create instance');
 		}
 	}
@@ -528,6 +574,57 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 								{creating && <LoaderIcon className="mr-2 size-4 animate-spin" />}
 								Create Server
 							</Button>
+						</DialogFooter>
+					</>
+				)}
+				{step === 'creating' && (
+					<>
+						<DialogHeader>
+							<DialogTitle>
+								{createDone ? 'Instance Created' : error ? 'Creation Failed' : 'Creating Instance...'}
+							</DialogTitle>
+							<DialogDescription>
+								{createDone
+									? `${name} is ready to go.`
+									: error
+										? 'Something went wrong while setting up your server.'
+										: `Setting up ${name}...`}
+							</DialogDescription>
+						</DialogHeader>
+						<div className="rounded-md border bg-muted/50 p-3 h-48 overflow-y-auto font-mono text-xs">
+							{setupLogs.length === 0 && !error && (
+								<div className="flex items-center gap-2 text-muted-foreground">
+									<LoaderIcon className="size-3 animate-spin" />
+									Initializing...
+								</div>
+							)}
+							{setupLogs.map((log, i) => (
+								<div key={i} className="flex items-start gap-2 py-0.5">
+									{i === setupLogs.length - 1 && !createDone && !error ? (
+										<LoaderIcon className="size-3 mt-0.5 shrink-0 animate-spin text-muted-foreground" />
+									) : log.startsWith('Error:') ? (
+										<XCircleIcon className="size-3 mt-0.5 shrink-0 text-destructive" />
+									) : (
+										<CheckCircleIcon className="size-3 mt-0.5 shrink-0 text-green-500" />
+									)}
+									<span className={log.startsWith('Error:') ? 'text-destructive' : ''}>{log}</span>
+								</div>
+							))}
+							<div ref={logsEndRef} />
+						</div>
+						{error && <p className="text-sm text-destructive">{error}</p>}
+						<DialogFooter>
+							{error && (
+								<Button variant="outline" onClick={() => { setError(''); setSetupLogs([]); setStep('configure'); }}>
+									<ArrowLeftIcon className="mr-2 size-4" />
+									Back
+								</Button>
+							)}
+							{createDone && (
+								<Button onClick={() => handleOpenChange(false)}>
+									Done
+								</Button>
+							)}
 						</DialogFooter>
 					</>
 				)}

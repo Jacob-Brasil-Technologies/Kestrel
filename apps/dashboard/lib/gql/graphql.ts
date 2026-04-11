@@ -162,6 +162,8 @@ export type CreateAdminInput = {
 };
 
 export type CreateInstanceInput = {
+  /** Correlation ID for subscribing to setup progress logs */
+  correlationId?: InputMaybe<Scalars['String']['input']>;
   gameType: GameType;
   maxMemory?: InputMaybe<Scalars['Int']['input']>;
   minMemory?: InputMaybe<Scalars['Int']['input']>;
@@ -265,6 +267,13 @@ export type Instance = {
   variant: GameVariant;
   variantInfo: VariantInfoDto;
   variantVersion: Scalars['String']['output'];
+};
+
+export type InstanceSetupLog = {
+  __typename?: 'InstanceSetupLog';
+  correlationId: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  timestamp: Scalars['DateTime']['output'];
 };
 
 export enum InstanceStatus {
@@ -521,11 +530,17 @@ export type SetupResponse = {
 export type Subscription = {
   __typename?: 'Subscription';
   consoleLogs: ConsoleLine;
+  instanceSetupLogs: InstanceSetupLog;
 };
 
 
 export type SubscriptionConsoleLogsArgs = {
   instanceId: Scalars['ID']['input'];
+};
+
+
+export type SubscriptionInstanceSetupLogsArgs = {
+  correlationId: Scalars['String']['input'];
 };
 
 export type SystemStats = {
@@ -642,6 +657,13 @@ export type GetAvailableRuntimesQueryVariables = Exact<{
 
 export type GetAvailableRuntimesQuery = { __typename?: 'Query', availableRuntimes: Array<{ __typename?: 'AvailableRuntimeDto', version: string, flags: Array<RuntimeFlag> }> };
 
+export type InstanceSetupLogsSubscriptionVariables = Exact<{
+  correlationId: Scalars['String']['input'];
+}>;
+
+
+export type InstanceSetupLogsSubscription = { __typename?: 'Subscription', instanceSetupLogs: { __typename?: 'InstanceSetupLog', message: string, timestamp: any } };
+
 export type ConsoleHistoryQueryVariables = Exact<{
   instanceId: Scalars['ID']['input'];
 }>;
@@ -674,6 +696,7 @@ export const GetVariantVersionsDocument = {"kind":"Document","definitions":[{"ki
 export const CreateInstanceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateInstance"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateInstanceInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createInstance"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<CreateInstanceMutation, CreateInstanceMutationVariables>;
 export const GetSystemStatsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetSystemStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"systemStats"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"platform"}}]}}]}}]} as unknown as DocumentNode<GetSystemStatsQuery, GetSystemStatsQueryVariables>;
 export const GetAvailableRuntimesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAvailableRuntimes"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"type"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"RuntimeType"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"availableRuntimes"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"Variable","name":{"kind":"Name","value":"type"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"version"}},{"kind":"Field","name":{"kind":"Name","value":"flags"}}]}}]}}]} as unknown as DocumentNode<GetAvailableRuntimesQuery, GetAvailableRuntimesQueryVariables>;
+export const InstanceSetupLogsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"InstanceSetupLogs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"correlationId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"instanceSetupLogs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"correlationId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"correlationId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}}]}}]}}]} as unknown as DocumentNode<InstanceSetupLogsSubscription, InstanceSetupLogsSubscriptionVariables>;
 export const ConsoleHistoryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ConsoleHistory"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"consoleHistory"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"instanceId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"instanceId"}},{"kind":"Field","name":{"kind":"Name","value":"line"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"source"}}]}}]}}]} as unknown as DocumentNode<ConsoleHistoryQuery, ConsoleHistoryQueryVariables>;
 export const ConsoleLogsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"ConsoleLogs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"consoleLogs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"instanceId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"instanceId"}},{"kind":"Field","name":{"kind":"Name","value":"line"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"source"}}]}}]}}]} as unknown as DocumentNode<ConsoleLogsSubscription, ConsoleLogsSubscriptionVariables>;
 export const SendCommandDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SendCommand"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"command"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sendCommand"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"instanceId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}}},{"kind":"Argument","name":{"kind":"Name","value":"command"},"value":{"kind":"Variable","name":{"kind":"Name","value":"command"}}}]}]}}]} as unknown as DocumentNode<SendCommandMutation, SendCommandMutationVariables>;

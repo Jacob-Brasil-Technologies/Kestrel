@@ -390,6 +390,9 @@ input CreateInstanceInput {
 
   """Server port; if omitted the game default is used"""
   port: Int
+
+  """Correlation ID for subscribing to setup progress logs"""
+  correlationId: String
 }
 
 input UpdateInstanceInput {
@@ -443,4 +446,11 @@ input ChangePasswordInput {
 
 type Subscription {
   consoleLogs(instanceId: ID!): ConsoleLine!
+  instanceSetupLogs(correlationId: String!): InstanceSetupLog!
+}
+
+type InstanceSetupLog {
+  correlationId: String!
+  message: String!
+  timestamp: DateTime!
 }

@@ -1,10 +1,12 @@
-import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Parent, Query, ResolveField, Resolver, Subscription } from '@nestjs/graphql';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GameInfoDto } from '../variant/dto/game-info.dto';
 import { VariantInfoDto } from '../variant/dto/variant-info.dto';
 import { VariantService } from '../variant/variant.service';
 import { CreateInstanceInput } from './dto/create-instance.input';
 import { UpdateInstanceInput } from './dto/update-instance.input';
 import { Instance } from './instance.entity';
+import { InstanceSetupLog, INSTANCE_SETUP_LOG_EVENT } from './instance-setup-log.model';
 import { InstanceService } from './instance.service';
 
 @Resolver(() => Instance)
@@ -12,6 +14,7 @@ export class InstanceResolver {
 	constructor(
 		private readonly instanceService: InstanceService,
 		private readonly variantService: VariantService,
+		private readonly eventEmitter: EventEmitter2,
 	) {}
 
 	@Query(() => [Instance])
@@ -50,5 +53,48 @@ export class InstanceResolver {
 	@ResolveField(() => VariantInfoDto)
 	public variantInfo(@Parent() instance: Instance): VariantInfoDto {
 		return this.variantService.getVariantInfo(instance.gameType, instance.variant)!;
+	}
+
+	@Subscription(() => InstanceSetupLog, {
+		filter: (payload: { instanceSetupLogs: InstanceSetupLog }, variables: { correlationId: string }) =>
+			payload.instanceSetupLogs.correlationId === variables.correlationId,
+	})
+	public instanceSetupLogs(@Args('correlationId') correlationId: string) {
+		const eventEmitter = this.eventEmitter;
+		const queue: InstanceSetupLog[] = [];
+		let resolve: ((value: IteratorResult<{ instanceSetupLogs: InstanceSetupLog }>) => void) | null = null;
+		let done = false;
+
+		const onLog = (log: InstanceSetupLog) => {
+			if (log.correlationId !== correlationId) return;
+			if (resolve) {
+				const r = resolve;
+				resolve = null;
+				r({ value: { instanceSetupLogs: log }, done: false });
+			} else {
+				queue.push(log);
+			}
+		};
+		eventEmitter.on(INSTANCE_SETUP_LOG_EVENT, onLog);
+
+		return {
+			[Symbol.asyncIterator]() {
+				return this;
+			},
+			async next(): Promise<IteratorResult<{ instanceSetupLogs: InstanceSetupLog }>> {
+				if (done) return { value: undefined as any, done: true };
+				if (queue.length > 0) {
+					return { value: { instanceSetupLogs: queue.shift()! }, done: false };
+				}
+				return new Promise((r) => {
+					resolve = r;
+				});
+			},
+			return() {
+				done = true;
+				eventEmitter.off(INSTANCE_SETUP_LOG_EVENT, onLog);
+				return Promise.resolve({ value: undefined as any, done: true });
+			},
+		};
 	}
 }

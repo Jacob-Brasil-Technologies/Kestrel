@@ -26,4 +26,7 @@ export class CreateInstanceInput {
 
 	@Field(() => Int, { nullable: true, description: 'Server port; if omitted the game default is used' })
 	port?: number;
+
+	@Field({ nullable: true, description: 'Correlation ID for subscribing to setup progress logs' })
+	correlationId?: string;
 }

@@ -421,7 +421,7 @@ export function AddCoreDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 						<DialogHeader>
 							<DialogTitle>Connected!</DialogTitle>
 							<DialogDescription>
-								You&apos;re now connected to <strong>{state.coreInfo?.name ?? 'Kestrel Core'}</strong>.
+								You&apos;re now connected to <strong>{coreNameInput.trim() || state.coreInfo?.name || 'Kestrel Core'}</strong>.
 							</DialogDescription>
 						</DialogHeader>
 						<div className="flex items-center justify-center py-6">

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GameType, getConfigurableArgs, getConfigurations, getGameTypeDetails, TGameVariant } from '@kestrel/types';
 import { ensureDir, remove, writeFile } from 'fs-extra';
@@ -10,6 +11,7 @@ import { CreateInstanceInput } from './dto/create-instance.input';
 import { UpdateInstanceInput } from './dto/update-instance.input';
 import { InstanceStatus } from '../../shared/enums';
 import { Instance } from './instance.entity';
+import { INSTANCE_SETUP_LOG_EVENT } from './instance-setup-log.model';
 
 @Injectable()
 export class InstanceService {
@@ -20,10 +22,21 @@ export class InstanceService {
 		private readonly instanceRepository: Repository<Instance>,
 		private readonly runtimeService: RuntimeService,
 		private readonly variantService: VariantService,
+		private readonly eventEmitter: EventEmitter2,
 	) {}
 
 	private get instancesRoot(): string {
 		return join(process.cwd(), 'data', 'instances');
+	}
+
+	private emitSetupLog(correlationId: string | undefined, message: string): void {
+		if (!correlationId) return;
+		this.logger.log(message);
+		this.eventEmitter.emit(INSTANCE_SETUP_LOG_EVENT, {
+			correlationId,
+			message,
+			timestamp: new Date(),
+		});
 	}
 
 	private validatePath(targetPath: string): void {
@@ -67,6 +80,7 @@ export class InstanceService {
 
 	public async createInstance(input: CreateInstanceInput): Promise<Instance> {
 		const gameDetails = getGameTypeDetails(input.gameType);
+		const cid = input.correlationId;
 
 		// Validate that the current platform is supported for this game
 		const currentPlatform = process.platform === 'win32' ? 'windows' : process.platform;
@@ -76,8 +90,9 @@ export class InstanceService {
 			);
 		}
 
-		this.logger.log(`Ensuring ${String(gameDetails.runtime)} ${input.runtimeVersion} is installed...`);
+		this.emitSetupLog(cid, `Installing ${String(gameDetails.runtime)} ${input.runtimeVersion} runtime...`);
 		const runtime = await this.runtimeService.with(gameDetails.runtime).ensureInstalled(input.runtimeVersion);
+		this.emitSetupLog(cid, 'Runtime ready.');
 
 		// Resolve default settings from userConfig
 		const portDefault = gameDetails.userConfig.find((c) => c.configType === 'port');
@@ -103,10 +118,11 @@ export class InstanceService {
 		try {
 			const provider = this.variantService.with(input.gameType, input.variant);
 
-			this.logger.log(`Downloading server for instance "${input.name}"...`);
+			this.emitSetupLog(cid, `Downloading ${String(input.variant)} server v${input.variantVersion}...`);
 			const { serverArgs: providerArgs, executableOverride } = await provider.downloadServer(input.variantVersion, instanceDir, {
 				runtimePath: runtime.executablePath,
 			});
+			this.emitSetupLog(cid, 'Server files downloaded.');
 
 			// Store arg templates (with placeholders like {MAX_MEMORY})
 			let templateArgs: string[];
@@ -130,13 +146,15 @@ export class InstanceService {
 			}
 
 			// Generate config files using instance settings
+			this.emitSetupLog(cid, 'Writing configuration files...');
 			await this.generateConfigFiles(instanceDir, input.gameType, instance);
 
 			await this.instanceRepository.save(instance);
-			this.logger.log(`Instance "${input.name}" created at ${instanceDir}`);
+			this.emitSetupLog(cid, `Instance "${input.name}" created successfully!`);
 			return instance;
 		} catch (error: any) {
 			this.logger.error(`Failed to create instance: ${error.message}`);
+			this.emitSetupLog(cid, `Error: ${error.message}`);
 			await remove(instanceDir);
 			throw error;
 		}
