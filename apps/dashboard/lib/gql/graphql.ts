@@ -196,6 +196,7 @@ export type GameInfoDto = {
   runtime: RuntimeType;
   supportedPlatforms: Array<Scalars['String']['output']>;
   type: GameType;
+  userConfig: Array<UserConfigEntryDto>;
 };
 
 export enum GameType {
@@ -253,7 +254,10 @@ export type Instance = {
   gameType: GameType;
   id: Scalars['ID']['output'];
   instancePath: Scalars['String']['output'];
+  maxMemory?: Maybe<Scalars['Int']['output']>;
+  minMemory?: Maybe<Scalars['Int']['output']>;
   name: Scalars['String']['output'];
+  port?: Maybe<Scalars['Int']['output']>;
   runtime: Runtime;
   status: InstanceStatus;
   updatedAt: Scalars['DateTime']['output'];
@@ -302,6 +306,7 @@ export type Mutation = {
   uninstallRuntime: Scalars['Boolean']['output'];
   /** Update the core configuration (name, icon, etc.) */
   updateCore: CoreConfig;
+  updateInstance: Instance;
 };
 
 
@@ -385,6 +390,12 @@ export type MutationUninstallRuntimeArgs = {
 
 export type MutationUpdateCoreArgs = {
   input: UpdateCoreInput;
+};
+
+
+export type MutationUpdateInstanceArgs = {
+  id: Scalars['ID']['input'];
+  input: UpdateInstanceInput;
 };
 
 export type Query = {
@@ -534,6 +545,13 @@ export type UpdateCoreInput = {
   name?: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateInstanceInput = {
+  maxMemory?: InputMaybe<Scalars['Int']['input']>;
+  minMemory?: InputMaybe<Scalars['Int']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  port?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type User = {
   __typename?: 'User';
   createdAt: Scalars['DateTime']['output'];
@@ -543,6 +561,12 @@ export type User = {
   role: UserRole;
   updatedAt: Scalars['DateTime']['output'];
   username: Scalars['String']['output'];
+};
+
+export type UserConfigEntryDto = {
+  __typename?: 'UserConfigEntryDto';
+  configType: Scalars['String']['output'];
+  default: Scalars['String']['output'];
 };
 
 export enum UserRole {
@@ -582,7 +606,7 @@ export type RestartServerMutation = { __typename?: 'Mutation', restartServer: bo
 export type GetGamesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetGamesQuery = { __typename?: 'Query', getGames: Array<{ __typename?: 'GameInfoDto', name: string, developer: string, icon: string, developerIcon: string, type: GameType, runtime: RuntimeType, supportedPlatforms: Array<string> }> };
+export type GetGamesQuery = { __typename?: 'Query', getGames: Array<{ __typename?: 'GameInfoDto', name: string, developer: string, icon: string, developerIcon: string, type: GameType, runtime: RuntimeType, supportedPlatforms: Array<string>, userConfig: Array<{ __typename?: 'UserConfigEntryDto', configType: string, default: string }> }> };
 
 export type GetVariantsQueryVariables = Exact<{
   for: GameType;
@@ -644,7 +668,7 @@ export type SendCommandMutation = { __typename?: 'Mutation', sendCommand: boolea
 export const StartServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"instanceId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}}}]}]}}]} as unknown as DocumentNode<StartServerMutation, StartServerMutationVariables>;
 export const StopServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StopServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stopServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"instanceId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}}}]}]}}]} as unknown as DocumentNode<StopServerMutation, StopServerMutationVariables>;
 export const RestartServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RestartServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"restartServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"instanceId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"instanceId"}}}]}]}}]} as unknown as DocumentNode<RestartServerMutation, RestartServerMutationVariables>;
-export const GetGamesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetGames"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getGames"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"developer"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"developerIcon"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"runtime"}},{"kind":"Field","name":{"kind":"Name","value":"supportedPlatforms"}}]}}]}}]} as unknown as DocumentNode<GetGamesQuery, GetGamesQueryVariables>;
+export const GetGamesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetGames"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getGames"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"developer"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"developerIcon"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"runtime"}},{"kind":"Field","name":{"kind":"Name","value":"supportedPlatforms"}},{"kind":"Field","name":{"kind":"Name","value":"userConfig"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"configType"}},{"kind":"Field","name":{"kind":"Name","value":"default"}}]}}]}}]}}]} as unknown as DocumentNode<GetGamesQuery, GetGamesQueryVariables>;
 export const GetVariantsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetVariants"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"for"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"GameType"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getVariants"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"for"},"value":{"kind":"Variable","name":{"kind":"Name","value":"for"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"icon"}},{"kind":"Field","name":{"kind":"Name","value":"variant"}}]}}]}}]} as unknown as DocumentNode<GetVariantsQuery, GetVariantsQueryVariables>;
 export const GetVariantVersionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetVariantVersions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"gameType"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"GameType"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"variant"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"GameVariant"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"getVariantVersions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"gameType"},"value":{"kind":"Variable","name":{"kind":"Name","value":"gameType"}}},{"kind":"Argument","name":{"kind":"Name","value":"variant"},"value":{"kind":"Variable","name":{"kind":"Name","value":"variant"}}}]}]}}]} as unknown as DocumentNode<GetVariantVersionsQuery, GetVariantVersionsQueryVariables>;
 export const CreateInstanceDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateInstance"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateInstanceInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createInstance"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<CreateInstanceMutation, CreateInstanceMutationVariables>;

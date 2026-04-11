@@ -193,7 +193,7 @@ export class ProcessService implements OnModuleInit, OnModuleDestroy {
 		// 3. Normal executables → run directly
 		let spawnCmd: string;
 		let spawnArgs: string[];
-		const args = instance.serverArgs ?? [];
+		const args = this.instanceService.resolveArgs(instance.serverArgs ?? [], instance);
 
 		const isShellScript = runtimePath.endsWith('.sh');
 		const executable = !isShellScript && await this.isExecutable(runtimePath);

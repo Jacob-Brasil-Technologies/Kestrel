@@ -69,6 +69,7 @@ export class VariantService {
 			type: game,
 			runtime: gameDetails.runtime,
 			supportedPlatforms: gameDetails.supportedPlatforms,
+			userConfig: gameDetails.userConfig,
 		};
 	}
 

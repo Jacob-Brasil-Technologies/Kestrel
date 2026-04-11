@@ -1,5 +1,5 @@
 import { GameType, GameVariant, type TGameVariant } from '@kestrel/types';
-import { Field, ObjectType } from '@nestjs/graphql';
+import { Field, Int, ObjectType } from '@nestjs/graphql';
 import { Column, Entity, ManyToOne } from 'typeorm';
 import { Base } from '../../shared/base.entity';
 import { InstanceStatus } from '../../shared/enums';
@@ -44,4 +44,16 @@ export class Instance extends Base<Instance> {
 
 	@Column({ type: 'simple-json', nullable: true })
 	public serverArgs: string[] = [];
+
+	@Column({ type: 'integer', nullable: true })
+	@Field(() => Int, { nullable: true })
+	public port: number | null = null;
+
+	@Column({ type: 'integer', nullable: true })
+	@Field(() => Int, { nullable: true })
+	public minMemory: number | null = null;
+
+	@Column({ type: 'integer', nullable: true })
+	@Field(() => Int, { nullable: true })
+	public maxMemory: number | null = null;
 }

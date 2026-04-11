@@ -2,7 +2,31 @@
 	"$schema": "game-type.schema.json",
 	"runtime": "java",
 	"supportedPlatforms": ["linux", "windows", "darwin"],
-	"args": ["-Xmx{{MAX_MEMORY}}", "-Xms{{MIN_MEMORY}}", "-jar", "server.jar", "nogui"],
+	"args": [
+		{
+			"arg": "-Xmx{MAX_MEMORY}",
+			"config": {
+				"configType": "maxMemory",
+				"default": "1G"
+			}
+		},
+		{
+			"arg": "-Xms{MIN_MEMORY}",
+			"config": {
+				"configType": "minMemory",
+				"default": "1G"
+			}
+		},
+		{
+			"arg": "-jar"
+		},
+		{
+			"arg": "server.jar"
+		},
+		{
+			"arg": "nogui"
+		}
+	],
 	"details": {
 		"name": "Minecraft",
 		"developer": "Mojang Studios",
@@ -270,7 +294,11 @@
 					"category": "Networking",
 					"linePrefix": "server-port=",
 					"valueType": "number",
-					"default": "25565"
+					"default": "25565",
+					"config": {
+						"configType": "port",
+						"default": "25565"
+					}
 				},
 				{
 					"name": "Server IP",

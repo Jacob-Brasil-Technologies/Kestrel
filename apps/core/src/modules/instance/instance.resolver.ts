@@ -3,6 +3,7 @@ import { GameInfoDto } from '../variant/dto/game-info.dto';
 import { VariantInfoDto } from '../variant/dto/variant-info.dto';
 import { VariantService } from '../variant/variant.service';
 import { CreateInstanceInput } from './dto/create-instance.input';
+import { UpdateInstanceInput } from './dto/update-instance.input';
 import { Instance } from './instance.entity';
 import { InstanceService } from './instance.service';
 
@@ -26,6 +27,14 @@ export class InstanceResolver {
 	@Mutation(() => Instance)
 	public async createInstance(@Args('input') input: CreateInstanceInput): Promise<Instance> {
 		return this.instanceService.createInstance(input);
+	}
+
+	@Mutation(() => Instance)
+	public async updateInstance(
+		@Args('id', { type: () => ID }) id: string,
+		@Args('input') input: UpdateInstanceInput,
+	): Promise<Instance> {
+		return this.instanceService.updateInstance(id, input);
 	}
 
 	@Mutation(() => Boolean)

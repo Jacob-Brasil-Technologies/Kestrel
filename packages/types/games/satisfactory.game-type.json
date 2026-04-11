@@ -13,5 +13,14 @@
 			"name": "Vanilla",
 			"desc": "The standard version of Satisfactory"
 		}
+	],
+	"args": [
+		{
+			"arg": "--Port={PORT}",
+			"config": {
+				"configType": "port",
+				"default": "7777"
+			}
+		}
 	]
 }

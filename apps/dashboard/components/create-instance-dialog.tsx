@@ -29,6 +29,10 @@ const GET_GAMES = gql`
 			type
 			runtime
 			supportedPlatforms
+			userConfig {
+				configType
+				default
+			}
 		}
 	}
 `;
@@ -77,6 +81,11 @@ const GET_AVAILABLE_RUNTIMES = gql`
 	}
 `;
 
+interface UserConfigEntry {
+	configType: string;
+	default: string;
+}
+
 interface GameInfo {
 	name: string;
 	developer: string;
@@ -85,6 +94,7 @@ interface GameInfo {
 	type: GameType;
 	runtime: RuntimeType;
 	supportedPlatforms: string[];
+	userConfig: UserConfigEntry[];
 }
 
 interface VariantInfo {
@@ -172,6 +182,15 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 	function handleSelectGame(game: GameInfo) {
 		setSelectedGame(game);
 		setName(`My ${game.name} Server`);
+
+		// Apply defaults from userConfig
+		const portCfg = game.userConfig.find(c => c.configType === 'port');
+		const minMemCfg = game.userConfig.find(c => c.configType === 'minMemory');
+		const maxMemCfg = game.userConfig.find(c => c.configType === 'maxMemory');
+		setPort(portCfg?.default ?? '');
+		setMinMemory(minMemCfg ? '1024' : '');
+		setMaxMemory(maxMemCfg ? '2048' : '');
+
 		// We'll check variant count after the query loads
 		setStep('variant');
 	}
@@ -206,6 +225,8 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 	async function handleCreate() {
 		setError('');
 		try {
+			const hasMinMem = selectedGame!.userConfig.some(c => c.configType === 'minMemory');
+			const hasMaxMem = selectedGame!.userConfig.some(c => c.configType === 'maxMemory');
 			await createInstance({
 				variables: {
 					input: {
@@ -214,8 +235,8 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 						variant: selectedVariant!.variant,
 						variantVersion,
 						runtimeVersion,
-						minMemory: parseInt(minMemory) || 1024,
-						maxMemory: parseInt(maxMemory) || 2048,
+						...(hasMinMem && minMemory ? { minMemory: parseInt(minMemory) } : {}),
+						...(hasMaxMem && maxMemory ? { maxMemory: parseInt(maxMemory) } : {}),
 						port: port ? parseInt(port) : undefined,
 					},
 				},
@@ -453,7 +474,9 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 								</div>
 							)}
 
+							{selectedGame?.userConfig.some(c => c.configType === 'minMemory' || c.configType === 'maxMemory') && (
 							<div className="flex gap-3">
+								{selectedGame?.userConfig.some(c => c.configType === 'minMemory') && (
 								<div className="flex flex-1 flex-col gap-2">
 									<Label htmlFor="min-memory">Min Memory (MB)</Label>
 									<Input
@@ -463,6 +486,8 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 										onChange={(e) => setMinMemory(e.target.value)}
 									/>
 								</div>
+								)}
+								{selectedGame?.userConfig.some(c => c.configType === 'maxMemory') && (
 								<div className="flex flex-1 flex-col gap-2">
 									<Label htmlFor="max-memory">Max Memory (MB)</Label>
 									<Input
@@ -472,18 +497,22 @@ export function CreateInstanceDialog({ open, onOpenChange }: { open: boolean; on
 										onChange={(e) => setMaxMemory(e.target.value)}
 									/>
 								</div>
+								)}
 							</div>
+							)}
 
+							{selectedGame?.userConfig.some(c => c.configType === 'port') && (
 							<div className="flex flex-col gap-2">
-								<Label htmlFor="port">Port (optional)</Label>
+								<Label htmlFor="port">Port</Label>
 								<Input
 									id="port"
 									type="number"
-									placeholder="Default"
+									placeholder={selectedGame?.userConfig.find(c => c.configType === 'port')?.default ?? ''}
 									value={port}
 									onChange={(e) => setPort(e.target.value)}
 								/>
 							</div>
+							)}
 
 							{error && <p className="text-sm text-destructive">{error}</p>}
 						</div>

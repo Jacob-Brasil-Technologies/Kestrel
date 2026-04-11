@@ -5,6 +5,13 @@
 // Interfaces
 // ============================================================
 
+export type UserConfigType = 'port' | 'minMemory' | 'maxMemory';
+
+export interface UserConfigEntry {
+	configType: UserConfigType;
+	default: string;
+}
+
 export interface GameTypeDetails {
 	name: string;
 	developer: string;
@@ -13,6 +20,7 @@ export interface GameTypeDetails {
 	runtime: RuntimeType;
 	args: string[];
 	supportedPlatforms: string[];
+	userConfig: UserConfigEntry[];
 }
 
 export interface VariantDetails {
@@ -37,6 +45,7 @@ export interface ConfigurationLine {
 	valueType: ConfigValueType;
 	enumOptions?: string[];
 	default?: string;
+	config?: UserConfigEntry;
 }
 
 export interface ConfigurationFile {
@@ -117,6 +126,7 @@ const GAME_TYPE_DETAILS: Record<GameType, GameTypeDetails> = {
 		runtime: RuntimeType.Native,
 		args: [],
 		supportedPlatforms: ['linux'],
+		userConfig: [],
 	},
 	[GameType.Minecraft]: {
 		name: 'Minecraft',
@@ -124,8 +134,13 @@ const GAME_TYPE_DETAILS: Record<GameType, GameTypeDetails> = {
 		icon: 'minecraft.png',
 		developerIcon: 'mojang.png',
 		runtime: RuntimeType.Java,
-		args: ['-Xmx{{MAX_MEMORY}}', '-Xms{{MIN_MEMORY}}', '-jar', 'server.jar', 'nogui'],
+		args: ['-Xmx{MAX_MEMORY}', '-Xms{MIN_MEMORY}', '-jar', 'server.jar', 'nogui'],
 		supportedPlatforms: ['linux', 'windows', 'darwin'],
+		userConfig: [
+			{ configType: 'maxMemory', default: '1G' },
+			{ configType: 'minMemory', default: '1G' },
+			{ configType: 'port', default: '25565' },
+		],
 	},
 	[GameType.Satisfactory]: {
 		name: 'Satisfactory',
@@ -133,8 +148,11 @@ const GAME_TYPE_DETAILS: Record<GameType, GameTypeDetails> = {
 		icon: 'satisfactory.png',
 		developerIcon: 'coffee-stain-studios.jpg',
 		runtime: RuntimeType.Steamcmd,
-		args: [],
+		args: ['--Port={PORT}'],
 		supportedPlatforms: ['linux', 'windows'],
+		userConfig: [
+			{ configType: 'port', default: '7777' },
+		],
 	},
 };
 
@@ -428,6 +446,7 @@ const CONFIGURATIONS: Partial<Record<GameType, ConfigurationFile[]>> = {
 					linePrefix: 'server-port=',
 					valueType: 'number',
 					default: '25565',
+					config: { configType: 'port', default: '25565' },
 				},
 				{
 					name: 'Server IP',
@@ -699,6 +718,11 @@ const CONFIGURATIONS: Partial<Record<GameType, ConfigurationFile[]>> = {
 	],
 };
 
+const CONFIGURABLE_ARGS: Partial<Record<GameType, string[]>> = {
+	[GameType.Minecraft]: ['-Xmx{MAX_MEMORY}', '-Xms{MIN_MEMORY}'],
+	[GameType.Satisfactory]: ['--Port={PORT}'],
+};
+
 // ============================================================
 // Lookup Functions
 // ============================================================
@@ -720,4 +744,9 @@ export function getModProviders(gameType: GameType): ModProviderDetails[] {
 
 export function getConfigurations(gameType: GameType): ConfigurationFile[] {
 	return CONFIGURATIONS[gameType] ?? [];
+}
+
+/** Returns arg templates that have userConfig metadata (used for merging with provider args) */
+export function getConfigurableArgs(gameType: GameType): string[] {
+	return CONFIGURABLE_ARGS[gameType] ?? [];
 }

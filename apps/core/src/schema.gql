@@ -86,6 +86,11 @@ type InstalledRuntimeDto {
   path: String!
 }
 
+type UserConfigEntryDto {
+  configType: String!
+  default: String!
+}
+
 type GameInfoDto {
   name: String!
   developer: String!
@@ -94,6 +99,7 @@ type GameInfoDto {
   type: GameType!
   runtime: RuntimeType!
   supportedPlatforms: [String!]!
+  userConfig: [UserConfigEntryDto!]!
 }
 
 enum GameType {
@@ -129,6 +135,9 @@ type Instance {
   runtime: Runtime!
   instancePath: String!
   status: InstanceStatus!
+  port: Int
+  minMemory: Int
+  maxMemory: Int
   gameInfo: GameInfoDto!
   variantInfo: VariantInfoDto!
 }
@@ -332,6 +341,7 @@ type Mutation {
   installRuntime(type: RuntimeType!, version: String!): Boolean!
   uninstallRuntime(type: RuntimeType!, version: String!): Boolean!
   createInstance(input: CreateInstanceInput!): Instance!
+  updateInstance(id: ID!, input: UpdateInstanceInput!): Instance!
   deleteInstance(id: ID!): Boolean!
   startServer(instanceId: ID!): Boolean!
   stopServer(instanceId: ID!): Boolean!
@@ -379,6 +389,13 @@ input CreateInstanceInput {
   maxMemory: Int = 2048
 
   """Server port; if omitted the game default is used"""
+  port: Int
+}
+
+input UpdateInstanceInput {
+  name: String
+  minMemory: Int
+  maxMemory: Int
   port: Int
 }
 

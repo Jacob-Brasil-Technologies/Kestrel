@@ -6,10 +6,15 @@ import { fileURLToPath } from 'url';
 // Types for the JSON schema
 // ---------------------------------------------------------------------------
 
+interface UserConfig {
+	configType: string;
+	default?: string;
+}
+
 interface GameTypeJson {
 	runtime: string;
 	supportedPlatforms: string[];
-	args?: string[];
+	args?: { arg: string; config?: UserConfig }[];
 	details: {
 		name: string;
 		developer: string;
@@ -31,6 +36,7 @@ interface GameTypeJson {
 			valueType: string;
 			enumOptions?: string[];
 			default?: string;
+			config?: UserConfig;
 		}[];
 	}[];
 	modProviders?: {
@@ -94,6 +100,15 @@ emit('// Interfaces');
 emit('// ============================================================');
 emit();
 
+emit("export type UserConfigType = 'port' | 'minMemory' | 'maxMemory';");
+emit();
+
+emit('export interface UserConfigEntry {');
+emit('\tconfigType: UserConfigType;');
+emit('\tdefault: string;');
+emit('}');
+emit();
+
 emit('export interface GameTypeDetails {');
 emit('\tname: string;');
 emit('\tdeveloper: string;');
@@ -102,6 +117,7 @@ emit('\tdeveloperIcon: string;');
 emit('\truntime: RuntimeType;');
 emit('\targs: string[];');
 emit('\tsupportedPlatforms: string[];');
+emit('\tuserConfig: UserConfigEntry[];');
 emit('}');
 emit();
 
@@ -130,6 +146,7 @@ emit('\tlinePrefix: string;');
 emit('\tvalueType: ConfigValueType;');
 emit('\tenumOptions?: string[];');
 emit('\tdefault?: string;');
+emit('\tconfig?: UserConfigEntry;');
 emit('}');
 emit();
 
@@ -242,8 +259,37 @@ emit();
 emit('const GAME_TYPE_DETAILS: Record<GameType, GameTypeDetails> = {');
 for (const game of games) {
 	const runtimeEnumKey = game.data.runtime.charAt(0).toUpperCase() + game.data.runtime.slice(1);
-	const argsLiteral = game.data.args ? `[${game.data.args.map((a) => `'${escapeString(a)}'`).join(', ')}]` : '[]';
+	// Extract arg template strings from the object format
+	const argTemplates = game.data.args ? game.data.args.map((a) => a.arg) : [];
+	const argsLiteral = `[${argTemplates.map((a) => `'${escapeString(a)}'`).join(', ')}]`;
 	const platformsLiteral = `[${game.data.supportedPlatforms.map((p) => `'${escapeString(p)}'`).join(', ')}]`;
+
+	// Collect userConfig from args and configuration lines (dedup by configType)
+	const configMap = new Map<string, { configType: string; default: string }>();
+	if (game.data.args) {
+		for (const argDef of game.data.args) {
+			if (argDef.config) {
+				configMap.set(argDef.config.configType, {
+					configType: argDef.config.configType,
+					default: argDef.config.default ?? '',
+				});
+			}
+		}
+	}
+	if (game.data.configurations) {
+		for (const config of game.data.configurations) {
+			for (const line of config.lines) {
+				if (line.config && !configMap.has(line.config.configType)) {
+					configMap.set(line.config.configType, {
+						configType: line.config.configType,
+						default: line.config.default ?? line.default ?? '',
+					});
+				}
+			}
+		}
+	}
+	const userConfigEntries = Array.from(configMap.values());
+
 	emit(`\t[GameType.${game.data.details.name}]: {`);
 	emit(`\t\tname: '${escapeString(game.data.details.name)}',`);
 	emit(`\t\tdeveloper: '${escapeString(game.data.details.developer)}',`);
@@ -252,6 +298,15 @@ for (const game of games) {
 	emit(`\t\truntime: RuntimeType.${runtimeEnumKey},`);
 	emit(`\t\targs: ${argsLiteral},`);
 	emit(`\t\tsupportedPlatforms: ${platformsLiteral},`);
+	if (userConfigEntries.length === 0) {
+		emit(`\t\tuserConfig: [],`);
+	} else {
+		emit(`\t\tuserConfig: [`);
+		for (const entry of userConfigEntries) {
+			emit(`\t\t\t{ configType: '${entry.configType}', default: '${escapeString(entry.default)}' },`);
+		}
+		emit(`\t\t],`);
+	}
 	emit(`\t},`);
 }
 emit('};');
@@ -307,6 +362,9 @@ function emitConfigLine(line: GameTypeJson['configurations'][0]['lines'][0], dep
 	if (line.default !== undefined) {
 		emit(`${indent(depth + 1)}default: '${escapeString(line.default)}',`);
 	}
+	if (line.config) {
+		emit(`${indent(depth + 1)}config: { configType: '${line.config.configType}', default: '${escapeString(line.config.default ?? line.default ?? '')}' },`);
+	}
 	emit(`${indent(depth)}},`);
 }
 
@@ -325,6 +383,17 @@ for (const game of games) {
 		emit(`\t\t},`);
 	}
 	emit(`\t],`);
+}
+emit('};');
+emit();
+
+// Configurable args — arg templates that have userConfig metadata
+emit('const CONFIGURABLE_ARGS: Partial<Record<GameType, string[]>> = {');
+for (const game of games) {
+	const configurableArgs = (game.data.args ?? []).filter((a) => a.config).map((a) => a.arg);
+	if (configurableArgs.length > 0) {
+		emit(`\t[GameType.${game.data.details.name}]: [${configurableArgs.map((a) => `'${escapeString(a)}'`).join(', ')}],`);
+	}
 }
 emit('};');
 emit();
@@ -356,6 +425,12 @@ emit();
 
 emit('export function getConfigurations(gameType: GameType): ConfigurationFile[] {');
 emit('\treturn CONFIGURATIONS[gameType] ?? [];');
+emit('}');
+emit();
+
+emit('/** Returns arg templates that have userConfig metadata (used for merging with provider args) */');
+emit('export function getConfigurableArgs(gameType: GameType): string[] {');
+emit('\treturn CONFIGURABLE_ARGS[gameType] ?? [];');
 emit('}');
 emit();
 
