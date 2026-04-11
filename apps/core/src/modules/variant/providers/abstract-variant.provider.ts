@@ -1,6 +1,8 @@
 export interface ServerDownloadOptions {
 	/** Path to the runtime executable (e.g., java binary, steamcmd) */
 	runtimePath?: string;
+	/** Optional callback to report progress messages to the caller */
+	onProgress?: (message: string) => void;
 }
 
 export interface ServerDownloadResult {

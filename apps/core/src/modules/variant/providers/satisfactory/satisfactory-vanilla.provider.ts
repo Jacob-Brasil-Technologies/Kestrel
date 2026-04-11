@@ -27,22 +27,40 @@ export class SatisfactoryVanillaProvider extends AbstractVariantProvider {
 		}
 
 		const steamcmdPath = options.runtimePath;
+		const progress = options.onProgress ?? (() => {});
 
 		// Ensure SteamCMD is fully updated before installing (it restarts on first run and loses args)
-		this.logger.log('Ensuring SteamCMD is up to date...');
+		progress('Ensuring SteamCMD is up to date...');
 		await this.runSteamCmd(steamcmdPath, ['+quit']);
 
-		this.logger.log('Downloading Satisfactory Dedicated Server via SteamCMD (this may take a while)...');
-		await this.runSteamCmd(steamcmdPath, [
-			'+force_install_dir',
-			targetDir,
-			'+login',
-			'anonymous',
-			'+app_update',
-			SATISFACTORY_APP_ID,
-			'validate',
-			'+quit',
-		]);
+		progress('Downloading Satisfactory Dedicated Server via SteamCMD (this may take a while)...');
+
+		// SteamCMD sometimes fails on the first attempt with "Missing configuration"
+		// when its internal app manifest cache is empty. Retry with a delay.
+		const maxAttempts = 3;
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			try {
+				await this.runSteamCmd(steamcmdPath, [
+					'+force_install_dir',
+					targetDir,
+					'+login',
+					'anonymous',
+					'+app_update',
+					SATISFACTORY_APP_ID,
+					'validate',
+					'+quit',
+				]);
+				break;
+			} catch (err: any) {
+				if (attempt < maxAttempts) {
+					this.logger.warn(`SteamCMD attempt ${attempt} failed: ${err.message}. Retrying in 5s...`);
+					progress(`SteamCMD attempt ${attempt} failed, retrying...`);
+					await new Promise((r) => setTimeout(r, 5000));
+				} else {
+					throw err;
+				}
+			}
+		}
 
 		// Determine the server executable path
 		const executablePath = this.getServerExecutable(targetDir);
@@ -55,7 +73,7 @@ export class SatisfactoryVanillaProvider extends AbstractVariantProvider {
 			await chmod(executablePath, 0o755);
 		}
 
-		this.logger.log('Satisfactory Dedicated Server downloaded successfully.');
+		progress('Satisfactory Dedicated Server downloaded successfully.');
 
 		return {
 			executableOverride: executablePath,

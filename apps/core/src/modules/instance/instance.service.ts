@@ -16,6 +16,8 @@ import { INSTANCE_SETUP_LOG_EVENT } from './instance-setup-log.model';
 @Injectable()
 export class InstanceService {
 	private readonly logger = new Logger('InstanceService');
+	/** Buffer setup logs so subscriptions that connect slightly late can replay them */
+	private readonly setupLogBuffer = new Map<string, { correlationId: string; message: string; timestamp: Date }[]>();
 
 	constructor(
 		@InjectRepository(Instance)
@@ -32,11 +34,23 @@ export class InstanceService {
 	private emitSetupLog(correlationId: string | undefined, message: string): void {
 		if (!correlationId) return;
 		this.logger.log(message);
-		this.eventEmitter.emit(INSTANCE_SETUP_LOG_EVENT, {
-			correlationId,
-			message,
-			timestamp: new Date(),
-		});
+		const entry = { correlationId, message, timestamp: new Date() };
+		// Buffer for late-connecting subscriptions
+		if (!this.setupLogBuffer.has(correlationId)) {
+			this.setupLogBuffer.set(correlationId, []);
+		}
+		this.setupLogBuffer.get(correlationId)!.push(entry);
+		this.eventEmitter.emit(INSTANCE_SETUP_LOG_EVENT, entry);
+	}
+
+	/** Return buffered setup logs for replay by the subscription resolver */
+	public getBufferedSetupLogs(correlationId: string): { correlationId: string; message: string; timestamp: Date }[] {
+		return this.setupLogBuffer.get(correlationId) ?? [];
+	}
+
+	/** Clean up buffer for a completed setup */
+	public clearSetupLogBuffer(correlationId: string): void {
+		this.setupLogBuffer.delete(correlationId);
 	}
 
 	private validatePath(targetPath: string): void {
@@ -121,6 +135,7 @@ export class InstanceService {
 			this.emitSetupLog(cid, `Downloading ${String(input.variant)} server v${input.variantVersion}...`);
 			const { serverArgs: providerArgs, executableOverride } = await provider.downloadServer(input.variantVersion, instanceDir, {
 				runtimePath: runtime.executablePath,
+				onProgress: (msg) => this.emitSetupLog(cid, msg),
 			});
 			this.emitSetupLog(cid, 'Server files downloaded.');
 

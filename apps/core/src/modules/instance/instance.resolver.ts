@@ -61,10 +61,16 @@ export class InstanceResolver {
 	})
 	public instanceSetupLogs(@Args('correlationId') correlationId: string) {
 		const eventEmitter = this.eventEmitter;
+		const instanceService = this.instanceService;
 		const queue: InstanceSetupLog[] = [];
 		let resolve: ((value: IteratorResult<{ instanceSetupLogs: InstanceSetupLog }>) => void) | null = null;
 		let done = false;
+		let historySent = false;
+		let historyLines: InstanceSetupLog[] = [];
+		let historyIndex = 0;
+		const seen = new Set<object>();
 
+		// Start listening immediately so we don't miss events during history replay
 		const onLog = (log: InstanceSetupLog) => {
 			if (log.correlationId !== correlationId) return;
 			if (resolve) {
@@ -83,6 +89,24 @@ export class InstanceResolver {
 			},
 			async next(): Promise<IteratorResult<{ instanceSetupLogs: InstanceSetupLog }>> {
 				if (done) return { value: undefined as any, done: true };
+
+				// Replay buffered history first
+				if (!historySent) {
+					if (historyIndex === 0) {
+						historyLines = instanceService.getBufferedSetupLogs(correlationId);
+						historyLines.forEach((l) => seen.add(l));
+					}
+					if (historyIndex < historyLines.length) {
+						const line = historyLines[historyIndex++];
+						return { value: { instanceSetupLogs: line }, done: false };
+					}
+					historySent = true;
+					// Drop live queue entries that were already replayed from the buffer
+					while (queue.length > 0 && seen.has(queue[0])) {
+						queue.shift();
+					}
+				}
+
 				if (queue.length > 0) {
 					return { value: { instanceSetupLogs: queue.shift()! }, done: false };
 				}
@@ -93,6 +117,7 @@ export class InstanceResolver {
 			return() {
 				done = true;
 				eventEmitter.off(INSTANCE_SETUP_LOG_EVENT, onLog);
+				instanceService.clearSetupLogBuffer(correlationId);
 				return Promise.resolve({ value: undefined as any, done: true });
 			},
 		};
