@@ -2,6 +2,7 @@
 # Nightly — runs on every push to the dev branch
 # Creates/updates a rolling "nightly" pre-release with dev builds and pushes
 # a Docker image tagged "dev" to ghcr.io.
+# Only rebuilds apps that have changed files.
 # =============================================================================
 name: Nightly
 
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1. Prepare — capture metadata for the nightly build
+  # 1. Prepare — capture metadata and detect which apps changed
   # ---------------------------------------------------------------------------
   prepare:
     runs-on: ubuntu-latest
@@ -28,8 +29,12 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       short_sha: ${{ steps.meta.outputs.short_sha }}
       image: ${{ steps.meta.outputs.image }}
+      core_changed: ${{ steps.changes.outputs.core }}
+      dashboard_changed: ${{ steps.changes.outputs.dashboard }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
 
       - name: Capture metadata
         id: meta
@@ -42,12 +47,49 @@ jobs:
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "### Nightly build: \`${VERSION}-dev.${SHORT_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Detect changed apps
+        id: changes
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "First push to branch — building everything"
+            echo "core=true" >> "$GITHUB_OUTPUT"
+            echo "dashboard=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}" 2>/dev/null || echo "")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          core=false
+          dashboard=false
+
+          # Shared paths trigger both
+          if echo "$CHANGED" | grep -qE '^(packages/types/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'; then
+            core=true
+            dashboard=true
+          fi
+
+          if echo "$CHANGED" | grep -qE '^apps/core/'; then
+            core=true
+          fi
+
+          if echo "$CHANGED" | grep -qE '^apps/dashboard/'; then
+            dashboard=true
+          fi
+
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "dashboard=$dashboard" >> "$GITHUB_OUTPUT"
+          echo "Core changed: $core, Dashboard changed: $dashboard" >> "$GITHUB_STEP_SUMMARY"
+
   # ---------------------------------------------------------------------------
   # 2. Build Core — per-OS matrix (native modules need platform-specific build)
   #    Uses @yao-pkg/pkg to produce single-file executables.
   # ---------------------------------------------------------------------------
   build-core:
     needs: prepare
+    if: needs.prepare.outputs.core_changed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +152,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build-dashboard:
     needs: prepare
+    if: needs.prepare.outputs.dashboard_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -245,6 +288,7 @@ jobs:
   # ---------------------------------------------------------------------------
   docker:
     needs: prepare
+    if: needs.prepare.outputs.core_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -272,6 +316,12 @@ jobs:
   # ---------------------------------------------------------------------------
   release:
     needs: [prepare, build-core, build-dashboard, docker]
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.build-core.result == 'success' || needs.build-core.result == 'skipped') &&
+      (needs.build-dashboard.result == 'success' || needs.build-dashboard.result == 'skipped') &&
+      (needs.build-core.result == 'success' || needs.build-dashboard.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

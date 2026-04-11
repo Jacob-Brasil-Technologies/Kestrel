@@ -2,6 +2,7 @@
 # Release — runs when a PR is merged into main
 # Creates a GitHub release with changelog, core + dashboard executables, and a
 # Docker image pushed to ghcr.io.
+# Only rebuilds apps that have changed files in the PR.
 # =============================================================================
 name: Release
 
@@ -16,7 +17,7 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # 1. Gate — only proceed if the PR was actually merged
+  # 1. Gate — only proceed if the PR was actually merged, detect changes
   # ---------------------------------------------------------------------------
   prepare:
     if: github.event.pull_request.merged == true
@@ -24,8 +25,12 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       image: ${{ steps.version.outputs.image }}
+      core_changed: ${{ steps.changes.outputs.core }}
+      dashboard_changed: ${{ steps.changes.outputs.dashboard }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Extract version from package.json
         id: version
@@ -36,12 +41,43 @@ jobs:
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "### Release version: \`v$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Detect changed apps
+        id: changes
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" 2>/dev/null || echo "")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          core=false
+          dashboard=false
+
+          # Shared paths trigger both
+          if echo "$CHANGED" | grep -qE '^(packages/types/|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'; then
+            core=true
+            dashboard=true
+          fi
+
+          if echo "$CHANGED" | grep -qE '^apps/core/'; then
+            core=true
+          fi
+
+          if echo "$CHANGED" | grep -qE '^apps/dashboard/'; then
+            dashboard=true
+          fi
+
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "dashboard=$dashboard" >> "$GITHUB_OUTPUT"
+          echo "Core changed: $core, Dashboard changed: $dashboard" >> "$GITHUB_STEP_SUMMARY"
+
   # ---------------------------------------------------------------------------
   # 2. Build Core — per-OS matrix (native modules need platform-specific build)
   #    Uses @yao-pkg/pkg to produce single-file executables.
   # ---------------------------------------------------------------------------
   build-core:
     needs: prepare
+    if: needs.prepare.outputs.core_changed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +140,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build-dashboard:
     needs: prepare
+    if: needs.prepare.outputs.dashboard_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -239,6 +276,7 @@ jobs:
   # ---------------------------------------------------------------------------
   docker:
     needs: prepare
+    if: needs.prepare.outputs.core_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -268,6 +306,12 @@ jobs:
   # ---------------------------------------------------------------------------
   release:
     needs: [prepare, build-core, build-dashboard, docker]
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.build-core.result == 'success' || needs.build-core.result == 'skipped') &&
+      (needs.build-dashboard.result == 'success' || needs.build-dashboard.result == 'skipped') &&
+      (needs.build-core.result == 'success' || needs.build-dashboard.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v6
