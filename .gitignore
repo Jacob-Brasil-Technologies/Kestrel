@@ -87,6 +87,3 @@ out/
 next-env.d.ts
 
 /apps/core/data/
-
-# npm lockfile — this project uses pnpm; avoid npm lockfiles in workspace packages
-package-lock.json

@@ -121,23 +121,11 @@ export class ProcessResolver {
 			return(): Promise<IteratorResult<{ consoleLogs: ConsoleLine }>> {
 				done = true;
 				eventEmitter.off(CONSOLE_LOG_EVENT, onLog);
-				liveQueue.length = 0;
-				if (liveResolve) {
-					const resolve = liveResolve;
-					liveResolve = null;
-					resolve({ value: undefined as any, done: true });
-				}
 				return Promise.resolve({ value: undefined as any, done: true });
 			},
 			throw(): Promise<IteratorResult<{ consoleLogs: ConsoleLine }>> {
 				done = true;
 				eventEmitter.off(CONSOLE_LOG_EVENT, onLog);
-				liveQueue.length = 0;
-				if (liveResolve) {
-					const resolve = liveResolve;
-					liveResolve = null;
-					resolve({ value: undefined as any, done: true });
-				}
 				return Promise.resolve({ value: undefined as any, done: true });
 			},
 		};

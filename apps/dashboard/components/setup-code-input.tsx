@@ -94,7 +94,7 @@ export function SetupCodeInput({ value, onChange, onComplete }: SetupCodeInputPr
 						type="text"
 						inputMode="text"
 						autoComplete="off"
-						maxLength={1}
+						maxLength={CODE_LENGTH}
 						value={char}
 						onChange={(e) => handleInput(i, e.target.value)}
 						onKeyDown={(e) => handleKeyDown(i, e)}

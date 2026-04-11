@@ -46,7 +46,7 @@ import { VariantModule } from './modules/variant/variant.module';
 		),
 		GraphQLModule.forRoot<ApolloDriverConfig>({
 			driver: ApolloDriver,
-			autoSchemaFile: join(process.cwd(), 'data', 'schema.gql'),
+			autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
 			playground: false,
 			subscriptions: {
 				'graphql-ws': {

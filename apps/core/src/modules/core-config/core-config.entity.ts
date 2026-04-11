@@ -15,7 +15,7 @@ export class CoreConfig extends Base<CoreConfig> {
 
 	@Column({ type: 'text', nullable: true })
 	@HideField()
-	public setupCode?: string | null;
+	public setupCode?: string;
 
 	@Column({ type: 'boolean', default: false })
 	@Field(() => Boolean)
