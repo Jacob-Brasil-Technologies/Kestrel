@@ -194,10 +194,45 @@ jobs:
           name: kestrel-dashboard-windows-x64
           path: kestrel-dashboard-windows-x64.exe
 
+      - name: Create macOS .app bundle
+        shell: bash
+        run: |
+          APP="Kestrel Dashboard.app"
+          mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
+          cp kestrel-dashboard-macos-arm64 "${APP}/Contents/MacOS/kestrel-dashboard"
+          chmod +x "${APP}/Contents/MacOS/kestrel-dashboard"
+          cat > "${APP}/Contents/Info.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key>
+              <string>Kestrel Dashboard</string>
+              <key>CFBundleDisplayName</key>
+              <string>Kestrel Dashboard</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.kestrel.dashboard</string>
+              <key>CFBundleVersion</key>
+              <string>${{ needs.prepare.outputs.version }}</string>
+              <key>CFBundleShortVersionString</key>
+              <string>${{ needs.prepare.outputs.version }}</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleExecutable</key>
+              <string>kestrel-dashboard</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>11.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          PLIST
+          zip -ry kestrel-dashboard-macos-arm64.zip "${APP}"
+
       - uses: actions/upload-artifact@v6
         with:
           name: kestrel-dashboard-macos-arm64
-          path: kestrel-dashboard-macos-arm64
+          path: kestrel-dashboard-macos-arm64.zip
 
   # ---------------------------------------------------------------------------
   # 4. Docker — build and push to GitHub Container Registry
