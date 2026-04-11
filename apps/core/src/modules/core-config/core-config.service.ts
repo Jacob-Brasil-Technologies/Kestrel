@@ -28,9 +28,7 @@ export class CoreConfigService {
 			return existing;
 		}
 
-		const setupCode = Math.floor(Math.random() * 0xffffffff)
-			.toString(16)
-			.padStart(8, '0');
+		const setupCode = (await import('crypto')).randomBytes(4).toString('hex');
 
 		const config = await this.coreConfigRepository
 			.create({
@@ -69,7 +67,7 @@ export class CoreConfigService {
 		const config = (await this.coreConfigRepository.find()).at(0);
 		if (!config) throw new NotFoundException('Core config not found.');
 
-		config.setupCode = null as any;
+		config.setupCode = null;
 		config.isSetup = true;
 		return this.coreConfigRepository.save(config);
 	}

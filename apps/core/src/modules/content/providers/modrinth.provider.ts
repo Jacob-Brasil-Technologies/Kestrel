@@ -17,7 +17,7 @@ const VARIANT_TO_LOADERS: Record<string, string[]> = {
 	vanilla: [],
 	paper: ['paper', 'spigot', 'bukkit', 'purpur'],
 	fabric: ['fabric'],
-	neoforge: ['neoforge'],
+	neoForge: ['neoforge'],
 };
 
 @Injectable()

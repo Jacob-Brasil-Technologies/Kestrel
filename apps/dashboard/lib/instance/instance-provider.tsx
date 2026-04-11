@@ -61,6 +61,12 @@ export function InstanceProvider({ children }: { children: React.ReactNode }) {
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [activeView, setActiveView] = useState<SidebarView>('console');
 
+	// Reset loading state and active instance when active core changes
+	useEffect(() => {
+		initialLoadDone.current = false;
+		setActiveId(null);
+	}, [activeCore?.url]);
+
 	// Auto-select first instance when data loads
 	useEffect(() => {
 		if (instances.length > 0 && (!activeId || !instances.find((i) => i.id === activeId))) {

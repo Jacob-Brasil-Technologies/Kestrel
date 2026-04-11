@@ -5,7 +5,7 @@
 
 # ---- Base ----
 FROM node:22-bookworm-slim AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
 WORKDIR /app
 
 # ---- Dependencies ----

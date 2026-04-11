@@ -54,7 +54,11 @@ export function removeCore(id: string) {
 	writeCores(cores);
 	const activeId = localStorage.getItem(ACTIVE_KEY);
 	if (activeId === id) {
-		localStorage.setItem(ACTIVE_KEY, cores[0]?.id ?? '');
+		if (cores[0]?.id) {
+			localStorage.setItem(ACTIVE_KEY, cores[0].id);
+		} else {
+			localStorage.removeItem(ACTIVE_KEY);
+		}
 	}
 }
 
