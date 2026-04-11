@@ -251,6 +251,8 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+          pattern: kestrel-*
+
 
       - name: List artifacts
         run: find artifacts -type f | sort
