@@ -1,0 +1,231 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://kestrel.io/game-type.schema.json",
+	"title": "GameType",
+	"description": "A game type defines the rules and mechanics for setting up a game server",
+	"type": "object",
+	"properties": {
+		"runtime": {
+			"type": "string",
+			"description": "The runtime environment for the game server, used for determining how to start the server and manage its process",
+			"enum": ["java", "steamcmd", "native"]
+		},
+		"args": {
+			"type": "array",
+			"description": "A list of command line arguments to pass to the game server process when starting it",
+			"items": {
+				"type": "object",
+				"properties": {
+					"arg": {
+						"type": "string",
+						"description": "The command line argument to pass to the game server process, can include placeholders for user configuration options in the format {configOptionName}"
+					},
+					"config": {
+						"$ref": "#/$defs/userConfig",
+						"description": "Defines how the argument can be configured by the user in the UI"
+					}
+				},
+				"required": ["arg"]
+			}
+		},
+		"details": {
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string",
+					"description": "The name of the game"
+				},
+				"developer": {
+					"type": "string",
+					"description": "The developer of the game"
+				},
+				"icon": {
+					"$ref": "#/$defs/imageUrl",
+					"description": "A URL to an icon representing the game"
+				},
+				"developerIcon": {
+					"$ref": "#/$defs/imageUrl",
+					"description": "A URL to an icon representing the developer"
+				}
+			},
+			"required": ["name", "developer", "icon", "developerIcon"]
+		},
+		"variants": {
+			"type": "array",
+			"description": "A list of game variants, which are different configurations of the game",
+			"items": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"description": "The name of the variant",
+						"examples": ["Vanilla"],
+						"pattern": "^[A-Z][A-Za-z]+$"
+					},
+					"desc": {
+						"type": "string",
+						"description": "A description of the variant"
+					},
+					"icon": {
+						"$ref": "#/$defs/imageUrl",
+						"description": "A URL to an icon representing the variant"
+					}
+				},
+				"required": ["name", "desc"],
+				"if": {
+					"not": {
+						"properties": {
+							"name": { "enum": ["Vanilla"] }
+						},
+						"required": ["name"]
+					}
+				},
+				"then": {
+					"required": ["desc", "icon"]
+				}
+			},
+			"contains": {
+				"properties": {
+					"name": { "enum": ["Vanilla"] }
+				},
+				"required": ["name"]
+			},
+			"minContains": 1,
+			"maxContains": 1,
+			"uniqueItems": true
+		},
+		"configurations": {
+			"type": "array",
+			"description": "A list of user configurable options for the game type",
+			"items": {
+				"type": "object",
+				"properties": {
+					"filePath": {
+						"type": "string",
+						"description": "The file path to the configuration file, relative to the instance's directory"
+					},
+					"lines": {
+						"type": "array",
+						"description": "A list of lines in the configuration file that can be modified by the user",
+						"items": {
+							"type": "object",
+							"properties": {
+								"name": {
+									"type": "string",
+									"description": "The name of the configuration option"
+								},
+								"desc": {
+									"type": "string",
+									"description": "A description of the configuration option"
+								},
+								"category": {
+									"type": "string",
+									"description": "The category of the configuration option, used for grouping related options together in the UI",
+									"enum": ["Networking", "World", "Server", "Gameplay", "Performance", "Admin", "Other", "Customization"]
+								},
+								"linePrefix": {
+									"type": "string",
+									"description": "A string that appears before the value in the configuration file, used for parsing the file and updating the value"
+								},
+								"valueType": {
+									"type": "string",
+									"description": "The type of the value, used for validating user input and displaying the appropriate UI element for editing the value",
+									"enum": ["string", "number", "boolean", "enum"],
+									"default": { "enum": ["string"] }
+								},
+								"enumOptions": {
+									"type": "array",
+									"description": "A list of valid options for the configuration option, used for validating user input and displaying a dropdown menu for editing the value when valueType is 'enum'",
+									"items": {
+										"type": "string"
+									}
+								},
+								"default": {
+									"type": "string",
+									"description": "The default value for the configuration option, used for resetting to defaults and file generation"
+								},
+								"config": {
+									"$ref": "#/$defs/userConfig",
+									"description": "Defines how the configuration option can be configured by the user in the UI"
+								}
+							},
+							"required": ["name", "desc", "category", "linePrefix", "valueType"],
+							"if": {
+								"properties": {
+									"valueType": { "enum": ["enum"] }
+								},
+								"required": ["valueType"]
+							},
+							"then": {
+								"required": ["enumOptions"],
+								"properties": {
+									"enumOptions": {
+										"minItems": 1,
+										"uniqueItems": true
+									}
+								}
+							}
+						}
+					}
+				},
+				"required": ["filePath", "lines"]
+			}
+		},
+		"supportedPlatforms": {
+			"type": "array",
+			"description": "The platforms this game server can run on. Uses Node.js process.platform values.",
+			"items": {
+				"type": "string",
+				"enum": ["linux", "windows", "darwin"]
+			},
+			"minItems": 1,
+			"uniqueItems": true
+		},
+		"modProviders": {
+			"type": "array",
+			"description": "A list of mod providers that can be used to install mods for this game",
+			"items": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"description": "The name of the mod provider"
+					},
+					"desc": {
+						"type": "string",
+						"description": "A description of the mod provider"
+					},
+					"icon": {
+						"$ref": "#/$defs/imageUrl",
+						"description": "A URL to an icon representing the mod provider"
+					}
+				},
+				"required": ["name", "desc", "icon"]
+			}
+		}
+	},
+	"required": ["runtime", "details", "variants", "supportedPlatforms"],
+	"$defs": {
+		"imageUrl": {
+			"type": "string",
+			"description": "A URL to an image file",
+			"pattern": "^[A-z0-9-_]*.(png|jpg|jpeg|gif|svg|webp)$"
+		},
+		"userConfig": {
+			"type": "object",
+			"description": "Defines where user options are stored and used for a game type",
+			"properties": {
+				"configType": {
+					"type": "string",
+					"description": "The type of user configuration, used for displaying the appropriate UI for editing user options",
+					"enum": ["port", "minMemory", "maxMemory"]
+				},
+				"default": {
+					"type": "string",
+					"description": "The default value for the user configuration option, used for resetting to defaults and file generation"
+				}
+			},
+			"required": ["configType"]
+		}
+	}
+}

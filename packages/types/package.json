@@ -1,0 +1,22 @@
+{
+	"name": "@kestrel/types",
+	"version": "1.0.0",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"generate": "tsx src/generate.ts && tsc",
+		"build": "tsc",
+		"prebuild": "npm run generate"
+	},
+	"devDependencies": {
+		"@types/node": "^25.5.2",
+		"tsx": "^4.21.0",
+		"typescript": "^5.8.3"
+	}
+}

@@ -1,0 +1,446 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type CoreConfig {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  icon: String
+  isSetup: Boolean!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type User {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  username: String!
+  role: UserRole!
+
+  """Whether the user must change their password on next login"""
+  mustChangePassword: Boolean!
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+type AuthResponse {
+  """JWT access token"""
+  token: String!
+  user: User!
+}
+
+"""Response when an admin creates a new user"""
+type CreateUserResponse {
+  user: User!
+
+  """
+  The generated temporary password. Show this to the admin once — it cannot be retrieved again.
+  """
+  generatedPassword: String!
+}
+
+"""Response from verifying the setup code"""
+type SetupResponse {
+  config: CoreConfig!
+
+  """Short-lived JWT for creating the initial admin account"""
+  setupToken: String!
+}
+
+type AvailableRuntimeDto {
+  version: String!
+  flags: [RuntimeFlag!]!
+}
+
+enum RuntimeFlag {
+  LTS
+  RECOMMENDED
+}
+
+type Runtime {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  type: RuntimeType!
+  version: String!
+  executablePath: String!
+}
+
+enum RuntimeType {
+  Java
+  Native
+  Steamcmd
+}
+
+type InstalledRuntimeDto {
+  version: String!
+  path: String!
+}
+
+type UserConfigEntryDto {
+  configType: String!
+  default: String!
+}
+
+type GameInfoDto {
+  name: String!
+  developer: String!
+  icon: String!
+  developerIcon: String!
+  type: GameType!
+  runtime: RuntimeType!
+  supportedPlatforms: [String!]!
+  userConfig: [UserConfigEntryDto!]!
+}
+
+enum GameType {
+  Factorio
+  Minecraft
+  Satisfactory
+}
+
+type VariantInfoDto {
+  name: String!
+  description: String!
+  icon: String!
+  variant: GameVariant!
+}
+
+enum GameVariant {
+  Vanilla
+  Fabric
+  NeoForge
+  Paper
+}
+
+type Instance {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  name: String!
+  gameType: GameType!
+
+  """The game variant / server software (e.g. vanilla, paper, fabric)"""
+  variant: GameVariant!
+  variantVersion: String!
+  runtime: Runtime!
+  instancePath: String!
+  status: InstanceStatus!
+  port: Int
+  minMemory: Int
+  maxMemory: Int
+  gameInfo: GameInfoDto!
+  variantInfo: VariantInfoDto!
+}
+
+enum InstanceStatus {
+  STOPPED
+  STARTING
+  RUNNING
+  STOPPING
+  CRASHED
+}
+
+type InstalledContent {
+  id: ID!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  instanceId: String!
+
+  """The mod provider this was installed from (e.g. modrinth)"""
+  provider: String!
+  projectId: String!
+  versionId: String!
+  contentType: ContentType!
+  name: String!
+  iconUrl: String
+  versionNumber: String!
+  fileName: String!
+
+  """Relative path within the instance directory"""
+  filePath: String!
+  fileHash: String
+}
+
+enum ContentType {
+  MOD
+  RESOURCE_PACK
+  SHADER
+  DATA_PACK
+  MODPACK
+}
+
+type ContentProject {
+  id: String!
+  slug: String!
+  projectType: ContentType!
+  title: String!
+  description: String!
+
+  """Full project description in markdown"""
+  body: String!
+  categories: [String!]!
+  gameVersions: [String!]!
+  downloads: Int!
+  follows: Int!
+  iconUrl: String
+  serverSide: String!
+  clientSide: String!
+  gallery: [String!]!
+  license: String
+  dateCreated: String!
+  dateModified: String!
+}
+
+type ContentSearchHit {
+  projectId: String!
+  projectType: ContentType!
+  slug: String!
+  title: String!
+  description: String!
+  categories: [String!]!
+  gameVersions: [String!]!
+  downloads: Int!
+  follows: Int!
+  iconUrl: String
+  dateModified: String!
+  latestVersion: String
+  license: String
+  serverSide: String!
+  clientSide: String!
+}
+
+type ContentSearchResponse {
+  hits: [ContentSearchHit!]!
+  offset: Int!
+  limit: Int!
+  totalHits: Int!
+}
+
+type ContentVersionFile {
+  url: String!
+  filename: String!
+  primary: Boolean!
+  size: Int!
+  sha1: String
+  sha512: String
+}
+
+type ContentVersionDependency {
+  projectId: String
+  versionId: String
+
+  """required, optional, incompatible, or embedded"""
+  dependencyType: String!
+}
+
+type ContentVersion {
+  id: String!
+  projectId: String!
+  name: String!
+  versionNumber: String!
+  gameVersions: [String!]!
+  loaders: [String!]!
+
+  """release, beta, or alpha"""
+  versionType: String!
+  downloads: Int!
+  changelog: String
+  datePublished: String!
+  files: [ContentVersionFile!]!
+  dependencies: [ContentVersionDependency!]!
+}
+
+type ConsoleLine {
+  instanceId: ID!
+  line: String!
+  timestamp: DateTime!
+  source: ConsoleSource!
+}
+
+enum ConsoleSource {
+  STDOUT
+  STDERR
+  SYSTEM
+}
+
+type SystemStats {
+  totalInstances: Int!
+  runningInstances: Int!
+  platform: String!
+  arch: String!
+  totalMemoryGB: Float!
+  freeMemoryGB: Float!
+  cpuCount: Int!
+}
+
+type Query {
+  installedRuntimes(type: RuntimeType!): [InstalledRuntimeDto!]!
+  availableRuntimes(type: RuntimeType!): [AvailableRuntimeDto!]!
+  instances: [Instance!]!
+  instance(id: ID!): Instance!
+  getGames: [GameInfoDto!]!
+  getVariants(for: GameType!): [VariantInfoDto!]!
+
+  """Get available server versions for a game variant"""
+  getVariantVersions(gameType: GameType!, variant: GameVariant!): [String!]!
+  consoleHistory(instanceId: ID!): [ConsoleLine!]!
+  systemStats: SystemStats!
+
+  """
+  Search for content from mod providers, filtered by instance compatibility
+  """
+  searchContent(input: SearchContentInput!): ContentSearchResponse!
+
+  """Get project details from a mod provider"""
+  contentProject(projectId: String!): ContentProject!
+
+  """
+  Get available versions for a project, filtered by instance compatibility
+  """
+  contentVersions(instanceId: ID!, projectId: String!): [ContentVersion!]!
+
+  """List all installed content for an instance"""
+  installedContent(instanceId: ID!): [InstalledContent!]!
+
+  """Returns the current core configuration"""
+  coreConfig: CoreConfig
+
+  """Returns the currently authenticated user"""
+  me: User!
+
+  """Whether any users have been created yet"""
+  hasUsers: Boolean!
+}
+
+input SearchContentInput {
+  """
+  The instance to search content for (determines game version and loader filtering)
+  """
+  instanceId: String!
+
+  """Search query"""
+  query: String
+
+  """Filter by content type"""
+  contentType: ContentType = MOD
+  limit: Int = 20
+  offset: Int = 0
+}
+
+type Mutation {
+  installRuntime(type: RuntimeType!, version: String!): Boolean!
+  uninstallRuntime(type: RuntimeType!, version: String!): Boolean!
+  createInstance(input: CreateInstanceInput!): Instance!
+  updateInstance(id: ID!, input: UpdateInstanceInput!): Instance!
+  deleteInstance(id: ID!): Boolean!
+  startServer(instanceId: ID!): Boolean!
+  stopServer(instanceId: ID!): Boolean!
+  restartServer(instanceId: ID!): Boolean!
+  sendCommand(instanceId: ID!, command: String!): Boolean!
+
+  """Install content from a mod provider into an instance"""
+  installContent(input: InstallContentInput!): InstalledContent!
+
+  """Uninstall content from an instance"""
+  uninstallContent(installedContentId: ID!): Boolean!
+
+  """Update the core configuration (name, icon, etc.)"""
+  updateCore(input: UpdateCoreInput!): CoreConfig!
+
+  """
+  Verify the setup code and receive a short-lived token for creating the admin account
+  """
+  setupCore(code: String!): SetupResponse!
+
+  """Create the initial admin account using the setup token"""
+  createAdmin(input: CreateAdminInput!): AuthResponse!
+
+  """Admin creates a new user with a generated temporary password"""
+  createUser(input: CreateUserInput!): CreateUserResponse!
+
+  """Log in with username and password to receive a JWT"""
+  login(input: LoginInput!): AuthResponse!
+
+  """Change your password. Clears the mustChangePassword flag."""
+  changePassword(input: ChangePasswordInput!): AuthResponse!
+}
+
+input CreateInstanceInput {
+  name: String!
+  gameType: GameType!
+
+  """The game variant / server software to use"""
+  variant: GameVariant!
+  variantVersion: String!
+
+  """Version of the runtime required by the game (e.g. "21" for Java)"""
+  runtimeVersion: String!
+  minMemory: Int = 1024
+  maxMemory: Int = 2048
+
+  """Server port; if omitted the game default is used"""
+  port: Int
+}
+
+input UpdateInstanceInput {
+  name: String
+  minMemory: Int
+  maxMemory: Int
+  port: Int
+}
+
+input InstallContentInput {
+  """The instance to install content into"""
+  instanceId: String!
+
+  """The mod provider project ID"""
+  projectId: String!
+
+  """The specific version ID to install"""
+  versionId: String!
+}
+
+input UpdateCoreInput {
+  name: String
+
+  """Icon image file upload"""
+  icon: Upload
+}
+
+"""The `Upload` scalar type represents a file upload."""
+scalar Upload
+
+input CreateAdminInput {
+  """The setup token returned by setupCore"""
+  setupToken: String!
+  username: String!
+  password: String!
+}
+
+input CreateUserInput {
+  username: String!
+}
+
+input LoginInput {
+  username: String!
+  password: String!
+}
+
+input ChangePasswordInput {
+  currentPassword: String!
+  newPassword: String!
+}
+
+type Subscription {
+  consoleLogs(instanceId: ID!): ConsoleLine!
+}

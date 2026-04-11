@@ -1,0 +1,22 @@
+{
+	"name": "kestrel",
+	"version": "0.1.0",
+	"private": true,
+	"packageManager": "pnpm@10.20.0",
+	"scripts": {
+		"dev:core": "pnpm --filter @kestrel/core start:dev",
+		"dev:dash": "pnpm --filter @kestrel/dashboard dev",
+		"dev": "pnpm run \"/^dev:*/\"",
+		"generate": "pnpm --filter @kestrel/types generate",
+		"build": "pnpm run generate && pnpm --filter !@kestrel/dashboard build && pnpm --filter @kestrel/dashboard build"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"better-sqlite3",
+			"bcrypt"
+		]
+	},
+	"devDependencies": {
+		"prettier": "^3.4.2"
+	}
+}

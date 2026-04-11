@@ -1,0 +1,56 @@
+name: Version Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-version:
+    name: Verify version bump
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: Get PR version
+        id: pr
+        run: echo "version=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Get main branch version
+        id: main
+        run: |
+          # Fetch the package.json from main; if it doesn't exist yet, treat as 0.0.0
+          HTTP_CODE=$(curl -s -o /tmp/main-pkg.json -w "%{http_code}" \
+            "https://raw.githubusercontent.com/${{ github.repository }}/main/package.json")
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "version=$(jq -r '.version' /tmp/main-pkg.json)" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compare versions
+        run: |
+          PR_VERSION="${{ steps.pr.outputs.version }}"
+          MAIN_VERSION="${{ steps.main.outputs.version }}"
+
+          echo "PR version:   $PR_VERSION"
+          echo "Main version: $MAIN_VERSION"
+
+          # Split into major.minor.patch
+          IFS='.' read -r pr_major pr_minor pr_patch <<< "$PR_VERSION"
+          IFS='.' read -r main_major main_minor main_patch <<< "$MAIN_VERSION"
+
+          # Numeric comparison: PR must be strictly greater
+          if [ "$pr_major" -gt "$main_major" ]; then
+            echo "✅ Version bumped ($MAIN_VERSION → $PR_VERSION)"
+            exit 0
+          elif [ "$pr_major" -eq "$main_major" ] && [ "$pr_minor" -gt "$main_minor" ]; then
+            echo "✅ Version bumped ($MAIN_VERSION → $PR_VERSION)"
+            exit 0
+          elif [ "$pr_major" -eq "$main_major" ] && [ "$pr_minor" -eq "$main_minor" ] && [ "$pr_patch" -gt "$main_patch" ]; then
+            echo "✅ Version bumped ($MAIN_VERSION → $PR_VERSION)"
+            exit 0
+          else
+            echo "❌ PR version ($PR_VERSION) is not higher than main ($MAIN_VERSION). Bump the version in package.json."
+            exit 1
+          fi
