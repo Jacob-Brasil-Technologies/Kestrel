@@ -13,9 +13,6 @@ permissions:
   contents: write
   packages: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 # Cancel any in-progress nightly runs when a new push arrives
 concurrency:
   group: nightly-${{ github.ref }}
@@ -32,7 +29,7 @@ jobs:
       short_sha: ${{ steps.meta.outputs.short_sha }}
       image: ${{ steps.meta.outputs.image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Capture metadata
         id: meta
@@ -47,6 +44,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # 2. Build Core — per-OS matrix (native modules need platform-specific build)
+  #    Uses @yao-pkg/pkg to produce single-file executables.
   # ---------------------------------------------------------------------------
   build-core:
     needs: prepare
@@ -57,19 +55,22 @@ jobs:
           - runner: ubuntu-latest
             platform: linux
             arch: x64
+            pkg_target: node22-linux-x64
           - runner: windows-latest
             platform: windows
             arch: x64
+            pkg_target: node22-win-x64
           - runner: macos-latest
             platform: macos
             arch: arm64
+            pkg_target: node22-macos-arm64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -80,57 +81,42 @@ jobs:
 
       - run: pnpm --filter @kestrel/core build
 
-      - name: Package with production dependencies
+      - name: Deploy production bundle
         run: pnpm --filter @kestrel/core deploy --prod --legacy kestrel-core-out
 
       - name: Copy compiled output
         shell: bash
         run: cp -r apps/core/dist kestrel-core-out/dist
 
-      - name: Create start script (Unix)
-        if: runner.os != 'Windows'
+      - name: Install pkg
+        run: npm install -g @yao-pkg/pkg
+
+      - name: Build executable
+        shell: bash
         run: |
-          cat > kestrel-core-out/start.sh << 'EOF'
-          #!/usr/bin/env bash
-          DIR="$(cd "$(dirname "$0")" && pwd)"
-          exec node "$DIR/dist/main"
-          EOF
-          chmod +x kestrel-core-out/start.sh
+          cd kestrel-core-out
+          pkg dist/main.js \
+            --target ${{ matrix.pkg_target }} \
+            --output ../kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}
 
-      - name: Create start script (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Set-Content -Path kestrel-core-out/start.bat -Value '@echo off
-          node "%~dp0dist\main"
-          pause'
-
-      - name: Archive (tar.gz)
-        if: runner.os != 'Windows'
-        run: tar -czf kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz -C kestrel-core-out .
-
-      - name: Archive (zip)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Compress-Archive -Path kestrel-core-out/* -DestinationPath kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}.zip
-
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}
-          path: kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}.*
+          path: kestrel-core-${{ matrix.platform }}-${{ matrix.arch }}*
 
   # ---------------------------------------------------------------------------
-  # 3. Build Dashboard — single build, packaged per platform
+  # 3. Build Dashboard — single build, cross-compiled for each platform
+  #    Next.js standalone is pure JS so cross-compilation works.
   # ---------------------------------------------------------------------------
   build-dashboard:
     needs: prepare
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -142,56 +128,72 @@ jobs:
       - run: pnpm --filter @kestrel/dashboard build
 
       - name: Assemble standalone output
+        shell: bash
         run: |
-          mkdir -p dashboard-standalone/.next
-          cp -r apps/dashboard/.next/standalone/* dashboard-standalone/
-          cp -r apps/dashboard/.next/static dashboard-standalone/.next/static
-          cp -r apps/dashboard/public dashboard-standalone/public
+          cp -r apps/dashboard/.next/standalone dashboard-standalone
 
-      - name: Package for Linux
+          # Next.js standalone in a monorepo nests under the workspace path
+          if [ -d dashboard-standalone/apps/dashboard ]; then
+            DASH_DIR="dashboard-standalone/apps/dashboard"
+          else
+            DASH_DIR="dashboard-standalone"
+          fi
+
+          mkdir -p "$DASH_DIR/.next"
+          cp -r apps/dashboard/.next/static "$DASH_DIR/.next/static"
+          cp -r apps/dashboard/public "$DASH_DIR/public"
+
+          # Record the entry point for the next step
+          if [ -f "$DASH_DIR/server.js" ]; then
+            echo "$DASH_DIR/server.js" > dashboard-standalone/.entry
+          else
+            echo "dashboard-standalone/server.js" > dashboard-standalone/.entry
+          fi
+
+      - name: Configure pkg and build executables
+        shell: bash
         run: |
-          cp -r dashboard-standalone kestrel-dashboard-pkg
-          cat > kestrel-dashboard-pkg/start.sh << 'EOF'
-          #!/usr/bin/env bash
-          DIR="$(cd "$(dirname "$0")" && pwd)"
-          HOSTNAME=0.0.0.0 PORT="${PORT:-3001}" exec node "$DIR/server.js"
-          EOF
-          chmod +x kestrel-dashboard-pkg/start.sh
-          tar -czf kestrel-dashboard-linux-x64.tar.gz -C kestrel-dashboard-pkg .
-          rm -rf kestrel-dashboard-pkg
+          cd dashboard-standalone
+          ENTRY=$(cat .entry | sed 's|^dashboard-standalone/||')
 
-      - name: Package for macOS
-        run: |
-          cp -r dashboard-standalone kestrel-dashboard-pkg
-          cat > kestrel-dashboard-pkg/start.sh << 'EOF'
-          #!/usr/bin/env bash
-          DIR="$(cd "$(dirname "$0")" && pwd)"
-          HOSTNAME=0.0.0.0 PORT="${PORT:-3001}" exec node "$DIR/server.js"
-          EOF
-          chmod +x kestrel-dashboard-pkg/start.sh
-          tar -czf kestrel-dashboard-macos-arm64.tar.gz -C kestrel-dashboard-pkg .
-          rm -rf kestrel-dashboard-pkg
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.pkg = {
+              scripts: [
+                '.next/server/**/*.js',
+                '.next/server/**/*.mjs',
+                'apps/**/.next/server/**/*.js',
+                'apps/**/.next/server/**/*.mjs'
+              ],
+              assets: [
+                '.next/**/*',
+                'public/**/*',
+                'apps/**/.next/**/*',
+                'apps/**/public/**/*'
+              ]
+            };
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+          npm install -g @yao-pkg/pkg
+          pkg "$ENTRY" --target node22-linux-x64 --output ../kestrel-dashboard-linux-x64
+          pkg "$ENTRY" --target node22-win-x64 --output ../kestrel-dashboard-windows-x64.exe
+          pkg "$ENTRY" --target node22-macos-arm64 --output ../kestrel-dashboard-macos-arm64
 
-      - name: Package for Windows
-        run: |
-          cp -r dashboard-standalone kestrel-dashboard-pkg
-          cat > kestrel-dashboard-pkg/start.bat << 'EOF'
-          @echo off
-          set HOSTNAME=0.0.0.0
-          if "%PORT%"=="" set PORT=3001
-          node "%~dp0server.js"
-          pause
-          EOF
-          cd kestrel-dashboard-pkg && zip -r ../kestrel-dashboard-windows-x64.zip . && cd ..
-          rm -rf kestrel-dashboard-pkg
-
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
-          name: kestrel-dashboard-archives
-          path: |
-            kestrel-dashboard-linux-x64.tar.gz
-            kestrel-dashboard-macos-arm64.tar.gz
-            kestrel-dashboard-windows-x64.zip
+          name: kestrel-dashboard-linux-x64
+          path: kestrel-dashboard-linux-x64
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: kestrel-dashboard-windows-x64
+          path: kestrel-dashboard-windows-x64.exe
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: kestrel-dashboard-macos-arm64
+          path: kestrel-dashboard-macos-arm64
 
   # ---------------------------------------------------------------------------
   # 4. Docker — build and push to ghcr with "dev" tag
@@ -200,7 +202,7 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v3
 
@@ -227,7 +229,7 @@ jobs:
     needs: [prepare, build-core, build-dashboard, docker]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Remove the previous nightly release & tag so we can recreate it
       - name: Delete previous nightly release
@@ -235,7 +237,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v6
         with:
           path: artifacts
           merge-multiple: true

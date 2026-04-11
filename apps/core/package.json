@@ -101,5 +101,11 @@
 			"./src/mikro-orm.config.ts",
 			"./dist/mikro-orm.config.js"
 		]
+	},
+	"pkg": {
+		"assets": [
+			"node_modules/better-sqlite3/build/Release/*.node",
+			"node_modules/bcrypt/lib/binding/**/*.node"
+		]
 	}
 }
