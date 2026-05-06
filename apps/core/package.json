@@ -27,14 +27,14 @@
 		"@nestjs/apollo": "^13.2.4",
 		"@nestjs/common": "^11.0.1",
 		"@nestjs/config": "^4.0.3",
-		"@nestjs/core": "^11.0.1",
+		"@nestjs/core": "^11.1.18",
 		"@nestjs/event-emitter": "^3.0.1",
 		"@nestjs/graphql": "^13.2.4",
 		"@nestjs/jwt": "^11.0.2",
 		"@nestjs/platform-express": "^11.0.1",
 		"@nestjs/serve-static": "^5.0.5",
 		"@nestjs/typeorm": "^11.0.0",
-		"axios": "^1.14.0",
+		"axios": "^1.15.2",
 		"bcrypt": "^6.0.0",
 		"better-sqlite3": "^12.8.0",
 		"fs-extra": "^11.3.4",
@@ -47,7 +47,7 @@
 		"tar": "^7.5.13",
 		"typeorm": "^0.3.28",
 		"unzipper": "^0.12.3",
-		"uuid": "^13.0.0"
+		"uuid": "^14.0.0"
 	},
 	"devDependencies": {
 		"@eslint/eslintrc": "^3.2.0",
